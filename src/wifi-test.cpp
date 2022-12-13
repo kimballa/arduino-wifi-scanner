@@ -35,7 +35,7 @@ void loop() {
         for (int i = 0; i < n; i++) {
             // Print SSID and RSSI for each network found
             DBGPRINTI("#", i + 1);
-            DBGPRINT(WiFi.SSID(i).c_str());
+            DBGPRINT(WiFi.SSID(i));
             DBGPRINT(WiFi.RSSI(i));
             delay(10);
         }

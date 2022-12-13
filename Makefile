@@ -1,0 +1,15 @@
+# (c) Copyright 2021 Aaron Kimball
+
+prog_name := wifi_test
+src_dirs := src
+
+libs := seeed_arduino_rpcwifi seeed_arduino_rpcunified seeed_arduino_mbedtls \
+	seeed_arduino_freertos seeed_arduino_sfud seeed_arduino_fs spi adafruit_zerodma \
+	PyArduinoDebug
+
+include_dirs += $(arch_include_root)/seeed_arduino_rpcwifi
+include_dirs += $(arch_include_root)/seeed_arduino_rpcunified
+include_dirs += $(arch_include_root)/seeed_arduino_freertos
+include_dirs += $(arch_include_root)/seeed_arduino_mbedtls
+
+include ../arduino-makefile/arduino.mk

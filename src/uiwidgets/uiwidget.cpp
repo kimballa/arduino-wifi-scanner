@@ -109,6 +109,49 @@ void UIWidget::getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t
   }
 }
 
+
+int16_t UIWidget::addBorderWidth(int16_t contentWidth) const {
+  // Given the width of the interior content as an arg, pad it as required to account
+  // for our border.
+
+  if ((_border_flags & BORDER_ROUNDED) == BORDER_ROUNDED) {
+    contentWidth += 2 * BORDER_ROUNDED_INNER_MARGIN;
+  } else {
+    if (_border_flags & BORDER_LEFT) {
+      contentWidth += BORDER_ACTIVE_INNER_MARGIN;
+    }
+
+    if (_border_flags & BORDER_RIGHT) {
+      contentWidth += BORDER_ACTIVE_INNER_MARGIN;
+    }
+  }
+
+  return contentWidth;
+}
+
+int16_t UIWidget::addBorderHeight(int16_t contentHeight) const {
+  // Given the height of the interior content as an arg, pad it as required to account
+  // for our border.
+
+  if ((_border_flags & BORDER_ROUNDED) == BORDER_ROUNDED) {
+    contentHeight += 2 * BORDER_ROUNDED_INNER_MARGIN;
+  } else {
+    if (_border_flags & BORDER_TOP) {
+      contentHeight += BORDER_ACTIVE_INNER_MARGIN;
+    }
+
+    if (_border_flags & BORDER_BOTTOM) {
+      contentHeight += BORDER_ACTIVE_INNER_MARGIN;
+    }
+  }
+
+  return contentHeight;
+}
+
+
+
+//////////////////////////// Panel /////////////////////
+
 void Panel::render(TFT_eSPI &lcd) {
   drawBackground(lcd);
   drawBorder(lcd);
@@ -127,4 +170,22 @@ void Panel::cascadeBoundingBox() {
 
   // Pass the entire inner child bounding box on to our sole child.
   _child->setBoundingBox(childX, childY, childW, childH);
+}
+
+int16_t Panel::getContentWidth(TFT_eSPI &lcd) const {
+  int16_t w = 0;
+  if (_child != NULL) {
+    w = _child->getContentWidth(lcd);
+  }
+
+  return addBorderWidth(w);
+}
+
+int16_t Panel::getContentHeight(TFT_eSPI &lcd) const {
+  int16_t h = 0;
+  if (_child != NULL) {
+    h = _child->getContentHeight(lcd);
+  }
+
+  return addBorderHeight(h);
 }

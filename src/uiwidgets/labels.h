@@ -36,6 +36,9 @@ public:
   void setText(const char *str) { _str = str; };
   const char* getText() const { return _str; };
 
+  virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
+  virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
+
 private:
   const char *_str;
 };
@@ -49,6 +52,9 @@ public:
 
   void setValue(long val) { _val = val; };
   long getValue() const { return _val; };
+
+  virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
+  virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
 
 private:
   long _val;
@@ -68,6 +74,9 @@ public:
 
   void setMaxDecimalDigits(uint8_t digits);
   uint8_t getMaxDecimalDigits() const { return _maxDecimalDigits; };
+
+  virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
+  virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
 
 private:
   float _val;

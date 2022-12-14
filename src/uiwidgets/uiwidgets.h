@@ -79,9 +79,9 @@ public:
   int16_t getHeight() const { return _h; }; // Return height of widget apportioned for rendering.
 
   // Return width required for widget to render all content without overflow.
-  virtual int16_t getContentWidth() const;
+  virtual int16_t getContentWidth(TFT_eSPI &lcd) const = 0;
   // Return height required for widget to render all content without overflow.
-  virtual int16_t getContentHeight() const;
+  virtual int16_t getContentHeight(TFT_eSPI &lcd) const = 0;
 
   bool isFocused() const { return _focused; };
   void setFocus(bool focus) { _focused = focus; };
@@ -93,6 +93,11 @@ protected:
    * padding that belongs to this widget.
    */
   void getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t &childW, int16_t &childH);
+
+  /** Adds required margin for L/R border to specified content width. */
+  int16_t addBorderWidth(int16_t contentWidth) const;
+  /** Adds required margin for top/bottom border to specified content height. */
+  int16_t addBorderHeight(int16_t contentHeight) const;
 
   int16_t _x, _y;
   int16_t _w, _h;
@@ -115,6 +120,8 @@ public:
 
   virtual void render(TFT_eSPI &lcd);
   virtual void cascadeBoundingBox();
+  virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
+  virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
 
 private:
   UIWidget *_child;
@@ -123,5 +130,6 @@ private:
 #include "screen.h"
 #include "row_col.h"
 #include "labels.h"
+#include "vscroll.h"
 
 #endif // __UI_WIDGETS_H

@@ -23,6 +23,9 @@ public:
   void setRowHeight(uint16_t offset, int16_t height);
   int16_t getRowHeight(uint16_t offset);
 
+  virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
+  virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
+
 private:
   uint16_t _numRows;
   UIWidget **_elements; // one for each row.
@@ -46,6 +49,9 @@ public:
   // sizing.
   void setColumnWidth(uint16_t offset, int16_t width);
   int16_t getColumnWidth(uint16_t offset);
+
+  virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
+  virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
 
 private:
   uint16_t _numCols;

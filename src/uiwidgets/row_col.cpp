@@ -141,7 +141,31 @@ int16_t Rows::getRowHeight(uint16_t offset) {
   return _heights[offset];
 }
 
+int16_t Rows::getContentWidth(TFT_eSPI &lcd) const {
+  // The width required for a Rows is the max width required by any child.
+  int16_t w = 0;
+  for (int i = 0; i < _numRows; i++) {
+    if (_elements[i] != NULL) {
+      w = max(w, _elements[i]->getContentWidth(lcd));
+    }
+  }
 
+  return addBorderWidth(w);
+}
+
+int16_t Rows::getContentHeight(TFT_eSPI &lcd) const {
+  // The height required for a Rows is the sum of the row heights allocated to the children.
+  // If any child is allocated EQUAL or FLEX height, return the entire height of this object.
+  int16_t h = 0;
+  for (int i = 0; i < _numRows; i++) {
+    if (_heights[i] == EQUAL || _heights[i] == FLEX) {
+      return _h; // We're going to expand to our entire allocated area.
+    }
+    h += _heights[i];
+  }
+
+  return addBorderHeight(h);
+}
 
 /////////////////////////////// Cols /////////////////////////////////////
 // TODO(aaron): This is unfortunately a near code-clone of Rows, but for the
@@ -283,5 +307,31 @@ int16_t Cols::getColumnWidth(uint16_t offset) {
   }
 
   return _widths[offset];
+}
+
+int16_t Cols::getContentHeight(TFT_eSPI &lcd) const {
+  // The height required for a Cols is the max height required by any child.
+  int16_t h = 0;
+  for (int i = 0; i < _numCols; i++) {
+    if (_elements[i] != NULL) {
+      h = max(h, _elements[i]->getContentHeight(lcd));
+    }
+  }
+
+  return addBorderHeight(h);
+}
+
+int16_t Cols::getContentWidth(TFT_eSPI &lcd) const {
+  // The width required for a Cols is the sum of the col widths allocated to the children.
+  // If any child is allocated EQUAL or FLEX height, return the entire width of this object.
+  int16_t w = 0;
+  for (int i = 0; i < _numCols; i++) {
+    if (_widths[i] == EQUAL || _widths[i] == FLEX) {
+      return _w; // We're going to expand to our entire allocated area.
+    }
+    w += _widths[i];
+  }
+
+  return addBorderWidth(w);
 }
 

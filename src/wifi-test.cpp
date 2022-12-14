@@ -24,6 +24,7 @@ IntLabel label2(312);
 FloatLabel label3(3.14159);
 Rows rows(3);
 Cols midCols(3);
+VScroll vscroll;
 
 void setup() {
   DBGSETUP();
@@ -47,14 +48,16 @@ void setup() {
   rows.setFixedHeight(EQUAL);
 
   midCols.setColumn(0, &label1, 50);
-  midCols.setColumn(1, &label2, EQUAL);
+  midCols.setColumn(1, &vscroll, EQUAL);
   midCols.setColumn(2, &label3, EQUAL);
 
   label1.setBorder(BORDER_BOTTOM | BORDER_RIGHT);
 
+  /*
   label2.setColor(TFT_BLACK);
   label2.setBackground(TFT_GREEN);
   label2.setBorder(BORDER_ROUNDED, TFT_RED);
+  */
 
   label3.setBorder(BORDER_RECT);
 

@@ -1,0 +1,27 @@
+
+* Test Panel/Rows/Cols containing labels
+* Test setting font and color on labels.
+* Test setting bg and border on Screen, Panel, Rows, Cols, Labels.
+
+* Make UI widget library
+  * (ok) Panel (nestable/composable; no visible chrome by default; holds another elt)
+    * (ok) Columns
+  * VScroll Widget
+    * Entry element
+    * Scrollbar
+  * Menu
+    * Button
+  * (ok) Text line
+    * (ok) Str text line
+    * (ok) Int text line
+    * (ok) Float text line
+  * (ok) All items can have border (square or rounded; viz on each side independently or full-around.)
+  * All items can be shown inverted for focus
+
+
+
+* Main UI
+  * List all wifi channels in a scrollable thingie
+  * Scroll thru the wifi channels
+  * Select a wifi channel > See a detail page.
+

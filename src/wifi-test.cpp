@@ -4,6 +4,7 @@
 
 #include<Arduino.h>
 #include<rpcWiFi.h>
+#include<TFT_eSPI.h>
 
 #define DEBUG
 #define DBG_PRETTY_FUNCTIONS
@@ -11,8 +12,17 @@
 //#define DBG_START_PAUSED
 #include<dbg.h>
 
+TFT_eSPI tft;
+
 void setup() {
     DBGSETUP();
+
+    tft.begin();
+    tft.setRotation(3);
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextFont(2); // 0 for 8px, 2 for 16px.
+    tft.setTextColor(TFT_RED);
+    tft.drawString("This is a test", 0, 0);
 
     // Set WiFi to station mode and disconnect from an AP if it was previously connected
     WiFi.mode(WIFI_STA);

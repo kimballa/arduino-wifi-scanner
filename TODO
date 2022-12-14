@@ -6,16 +6,17 @@
     * Entry element
     * Scrollbar
   * Menu
-    * Button
+  * Button
   * (ok) Text line
     * (ok) Str text line
     * (ok) Int text line
     * (ok) Float text line
   * (ok) All items can have border (square or rounded; viz on each side independently or full-around.)
-  * All items can be shown inverted for focus
+  * (ok) All items can be shown inverted for focus
   * Add invalidateElem(UIWidget*) method to redraw only the components of the screen that
     get composited into the rect for that widget.
-
+  * Checkbox ?
+  * Radio button ?
 
 * Main UI
   * List all wifi channels in a scrollable thingie

@@ -3,52 +3,16 @@
 #ifndef __UIW_SCREEN_H
 #define __UIW_SCREEN_H
 
-
-class UIWidget {
-public:
-  UIWidget(): _x(0), _y(0), _w(0), _h(0),
-      _border_flags(BORDER_NONE), _border_color(TFT_WHITE), _bg_color(BG_NONE) {
-  };
-
-  /** Render the widget to the screen, along with any child widgets. */
-  virtual void render(TFT_eSPI &lcd) = 0;
-
-  /** Set the bounding box for this widget. */
-  void setBoundingBox(int16_t x, int16_t y, int16_t w, int16_t h);
-
-  /** Called by setBoundingBox(); cascades bounding box requirements to any child elements. */
-  virtual void cascadeBoundingBox() { };
-
-  void setBorder(const border_flags_t flags, uint16_t color=TFT_WHITE);
-  /**
-   * A color to fill in for the background, or BG_NONE for no background (i.e., inherit bg from
-   * container). */
-  void setBackground(uint16_t color);
-
-  int16_t getX() const { return _x; };
-  int16_t getY() const { return _y; };
-  int16_t getWidth() const { return _w; };
-  int16_t getHeight() const { return _h; };
-
-protected:
-  void drawBorder(TFT_eSPI &lcd);
-  void drawBackground(TFT_eSPI &lcd);
-  /** Get area bounding box available for rendering within the context of any border or other
-   * padding that belongs to this widget.
-   */
-  void getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t &childW, int16_t &childH);
-
-  int16_t _x, _y;
-  int16_t _w, _h;
-
-  border_flags_t _border_flags;
-  uint16_t _border_color;
-  uint16_t _bg_color;
-};
-
+/**
+ * A Screen is the top-level UIWidgets container. This is not itself a UIWidget;
+ * it holds a UIWidget (likely a Panel, Rows, or Cols) to be drawn.
+ *
+ * You can have several Screens that represent different menus, displays, etc. but
+ * only one Screen is shown at a time.
+ */
 class Screen {
 public:
-  Screen(TFT_eSPI &lcd): _lcd(lcd), _bgColor(TFT_BLACK), _widget(NULL) {};
+  Screen(TFT_eSPI &lcd): _lcd(lcd), _widget(NULL), _bgColor(TFT_BLACK) {};
 
   void setWidget(UIWidget *w);
   UIWidget *getWidget() const { return _widget; };
@@ -65,19 +29,6 @@ private:
   UIWidget *_widget; // The top-most widget for rendering the screen.
 
   uint16_t _bgColor;
-};
-
-class Panel : public UIWidget {
-public:
-  Panel(): UIWidget(), _child(NULL) {};
-
-  void setChild(UIWidget *widget) { _child = widget; };
-
-  virtual void render(TFT_eSPI &lcd);
-  virtual void cascadeBoundingBox();
-
-private:
-  UIWidget *_child;
 };
 
 #endif // __UIW_SCREEN_H

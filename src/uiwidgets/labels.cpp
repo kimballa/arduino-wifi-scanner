@@ -9,10 +9,12 @@ void Label::render(TFT_eSPI &lcd) {
   // Render the text within the child area bounding box.
   // Tee up all the settings...
   lcd.setTextFont(_fontId);
+  uint16_t text_color = _focused ? invertColor(_color) : _color;
   if (_bg_color != BG_NONE) {
-    lcd.setTextColor(_color, _bg_color);
+    uint16_t bg = _focused ? invertColor(_bg_color) : _bg_color;
+    lcd.setTextColor(text_color, bg);
   } else {
-    lcd.setTextColor(_color);
+    lcd.setTextColor(text_color);
   }
 
   // Then call virtual method to actually print the text.

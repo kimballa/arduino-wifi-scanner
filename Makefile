@@ -13,4 +13,6 @@ include_dirs += $(arch_include_root)/seeed_arduino_rpcunified
 include_dirs += $(arch_include_root)/seeed_arduino_freertos
 include_dirs += $(arch_include_root)/seeed_arduino_mbedtls
 
+XFLAGS += -Wall
+
 include ../arduino-makefile/arduino.mk

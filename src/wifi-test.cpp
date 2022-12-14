@@ -56,6 +56,8 @@ void setup() {
   label2.setBackground(TFT_GREEN);
   label2.setBorder(BORDER_ROUNDED, TFT_RED);
 
+  label3.setBorder(BORDER_RECT);
+
   screen.render();
 }
 

@@ -55,7 +55,7 @@ void UIWidget::drawBorder(TFT_eSPI &lcd) {
     }
 
     if (_border_flags & BORDER_BOTTOM) {
-      lcd.drawFastHLine(_x, _y + _h, _w, _border_color);
+      lcd.drawFastHLine(_x, _y + _h - 1, _w, _border_color);
     }
 
     if (_border_flags & BORDER_LEFT) {
@@ -63,7 +63,7 @@ void UIWidget::drawBorder(TFT_eSPI &lcd) {
     }
 
     if (_border_flags & BORDER_RIGHT) {
-      lcd.drawFastVLine(_x + _w, _y, _h, _border_color);
+      lcd.drawFastVLine(_x + _w - 1, _y, _h, _border_color);
     }
   }
 }

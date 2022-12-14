@@ -30,7 +30,7 @@ constexpr border_flags_t BORDER_RECT   = BORDER_LEFT | BORDER_RIGHT | BORDER_TOP
 constexpr border_flags_t BORDER_ROUNDED = 0x10;
 
 // 3 pixel radius for all rounded rectangles.
-constexpr int16_t BORDER_ROUNDED_RADIUS = 3;
+constexpr int16_t BORDER_ROUNDED_RADIUS = 4;
 constexpr int16_t BORDER_ROUNDED_INNER_MARGIN = 5; // rounded border moves contents in by 5 px.
 constexpr int16_t BORDER_ACTIVE_INNER_MARGIN = 3; // rectangular border moves contents in by 3 px.
 

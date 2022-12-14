@@ -7,7 +7,7 @@
 class UIWidget {
 public:
   UIWidget(): _x(0), _y(0), _w(0), _h(0),
-      _border_flags(BORDER_NONE), _border_color(TFT_BLACK), _bg_color(BG_NONE) {
+      _border_flags(BORDER_NONE), _border_color(TFT_WHITE), _bg_color(BG_NONE) {
   };
 
   /** Render the widget to the screen, along with any child widgets. */
@@ -19,11 +19,16 @@ public:
   /** Called by setBoundingBox(); cascades bounding box requirements to any child elements. */
   virtual void cascadeBoundingBox() { };
 
-  void setBorder(const border_flags_t flags, uint16_t color);
+  void setBorder(const border_flags_t flags, uint16_t color=TFT_WHITE);
   /**
    * A color to fill in for the background, or BG_NONE for no background (i.e., inherit bg from
    * container). */
   void setBackground(uint16_t color);
+
+  int16_t getX() const { return _x; };
+  int16_t getY() const { return _y; };
+  int16_t getWidth() const { return _w; };
+  int16_t getHeight() const { return _h; };
 
 protected:
   void drawBorder(TFT_eSPI &lcd);

@@ -29,19 +29,21 @@ protected:
 class StrLabel: public Label {
 public:
   StrLabel(): Label(), _str() { };
+  StrLabel(const char *text): Label(), _str(text) { };
 
   virtual void renderText(TFT_eSPI &lcd);
 
-  void setText(char *str) { _str = str; };
-  char* getText() const { return _str; };
+  void setText(const char *str) { _str = str; };
+  const char* getText() const { return _str; };
 
 private:
-  char *_str;
+  const char *_str;
 };
 
 class IntLabel: public Label {
 public:
   IntLabel(): Label(), _val(0) { };
+  IntLabel(long x): Label(), _val(x) { };
 
   virtual void renderText(TFT_eSPI &lcd);
 
@@ -56,6 +58,8 @@ private:
 class FloatLabel: public Label {
 public:
   FloatLabel(): Label(), _val(0.0f), _maxDecimalDigits(7) { };
+  FloatLabel(float f): Label(), _val(f), _maxDecimalDigits(7) { };
+  FloatLabel(float f, uint8_t d): Label(), _val(f), _maxDecimalDigits(d) { };
 
   virtual void renderText(TFT_eSPI &lcd);
 

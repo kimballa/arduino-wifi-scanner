@@ -17,7 +17,12 @@
     * (ok) Float text line
   * (ok) All items can have border (square or rounded; viz on each side independently or full-around.)
   * All items can be shown inverted for focus
-
+  * Add invalidateElem(UIWidget*) method to redraw only the components of the screen that
+    get composited into the rect for that widget.
+  * On first call to render(), do a setBoundingBox() on the top-level widget from Screen, to force it to
+    cascadeBoundingBox() to everything in case we bound something out of order? This feels
+    undependendable, like there should be a more resilient way to ensure that any widget hierarchy
+    binding order triggers the appropriate cascadeBoundingBox() calls...
 
 
 * Main UI

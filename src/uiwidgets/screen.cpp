@@ -10,6 +10,12 @@ void Screen::render() {
   }
 }
 
+void Screen::setWidget(UIWidget *w) {
+  _widget = w;
+  if (NULL != _widget) {
+    _widget->setBoundingBox(0, 0, getWidth(), getHeight());
+  }
+}
 
 void UIWidget::setBoundingBox(int16_t x, int16_t y, int16_t w, int16_t h) {
   // Update the bounding box for our own rendering.

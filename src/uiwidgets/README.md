@@ -28,6 +28,8 @@ or `Cols`; these can be configured to have N items across or down (which may be 
 `Cols`). Each object has an x, y, width, and height.  As containing objects are moved by layout
 changes, they cascade the position and size offsets to their children.
 
+Each UIWidget knows its absolute coordinates, so if a small element of the screen is invalidated
+due to changed data, a hierarchical sub-portion of the screen can be redrawn.
 
 Widgets
 =======

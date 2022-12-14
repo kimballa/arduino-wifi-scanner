@@ -5,6 +5,7 @@
 #include<Arduino.h>
 #include<rpcWiFi.h>
 #include<TFT_eSPI.h>
+#include "uiwidgets/uiwidgets.h"
 
 #define DEBUG
 #define DBG_PRETTY_FUNCTIONS
@@ -13,6 +14,15 @@
 #include<dbg.h>
 
 TFT_eSPI tft;
+
+Screen screen(tft);
+String msg1("First Row label.");
+String msg2("Second Row label.");
+String msg3("And the mightly THIRD row label.");
+StrLabel label1(msg1.c_str());
+StrLabel label2(msg2.c_str());
+StrLabel label3(msg3.c_str());
+Rows rows(3);
 
 void setup() {
     DBGSETUP();
@@ -30,9 +40,14 @@ void setup() {
     delay(100);
 
     DBGPRINT("Setup done");
+
+    screen.setWidget(&rows);
+    rows.setRow(0, &label1, 200);
+    rows.setRow(1, &label2, EQUAL);
+    rows.setRow(2, &label3, EQUAL);
 }
 
-void loop() {
+void wifiLoop() {
     DBGPRINT("scan start");
 
     // WiFi.scanNetworks will return the number of networks found
@@ -58,3 +73,7 @@ void loop() {
 
 
 
+void loop() {
+  screen.render();
+  delay(1000);
+}

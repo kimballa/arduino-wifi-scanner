@@ -45,6 +45,8 @@ void Rows::setNumRows(uint16_t numRows) {
     delete [] oldElements;
     delete [] oldHeights;
   }
+
+  cascadeBoundingBox();
 }
 
 void Rows::render(TFT_eSPI &lcd) {
@@ -78,8 +80,10 @@ void Rows::cascadeBoundingBox() {
       rowsWithClaimedHeight++;
     }
   }
+
   int16_t equalRowsAvailableHeight = max(0, childH - claimedHeight);
   int16_t equalRowsCount = _numRows - rowsWithClaimedHeight;
+  // This gives us the actual height to apportion to a row configured to EQUAL sizing.
   const int16_t equalRowHeight = equalRowsAvailableHeight / max(equalRowsCount, 1);
 
   // Now calculate the actual heights/offsets of each row.
@@ -109,12 +113,15 @@ void Rows::setRow(uint16_t offset, UIWidget *widget, int16_t height) {
 
   _elements[offset] = widget;
   _heights[offset] = height;
+  cascadeBoundingBox();
 }
 
 void Rows::setFixedHeight(int16_t height) {
   for (uint16_t i = 0; i < _numRows; i++) {
     _heights[i] = height;
   }
+
+  cascadeBoundingBox();
 }
 
 void Rows::setRowHeight(uint16_t offset, int16_t height) {
@@ -123,6 +130,7 @@ void Rows::setRowHeight(uint16_t offset, int16_t height) {
   }
 
   _heights[offset] = height;
+  cascadeBoundingBox();
 }
 
 int16_t Rows::getRowHeight(uint16_t offset) {
@@ -182,6 +190,8 @@ void Cols::setNumCols(uint16_t numCols) {
     delete [] oldElements;
     delete [] oldWidths;
   }
+
+  cascadeBoundingBox();
 }
 
 void Cols::render(TFT_eSPI &lcd) {
@@ -217,6 +227,7 @@ void Cols::cascadeBoundingBox() {
   }
   int16_t equalColsAvailableWidth = max(0, childW - claimedWidth);
   int16_t equalColsCount = _numCols - colsWithClaimedWidth;
+  // This gives us the actual width to apportion to a col configured to EQUAL sizing.
   const int16_t equalColWidth = equalColsAvailableWidth / max(equalColsCount, 1);
 
   // Now calculate the actual widths/offsets of each col.
@@ -246,12 +257,15 @@ void Cols::setColumn(uint16_t offset, UIWidget *widget, int16_t width) {
 
   _elements[offset] = widget;
   _widths[offset] = width;
+  cascadeBoundingBox();
 }
 
 void Cols::setFixedWidth(int16_t width) {
   for (uint16_t i = 0; i < _numCols; i++) {
     _widths[i] = width;
   }
+
+  cascadeBoundingBox();
 }
 
 void Cols::setColumnWidth(uint16_t offset, int16_t width) {
@@ -260,6 +274,7 @@ void Cols::setColumnWidth(uint16_t offset, int16_t width) {
   }
 
   _widths[offset] = width;
+  cascadeBoundingBox();
 }
 
 int16_t Cols::getColumnWidth(uint16_t offset) {

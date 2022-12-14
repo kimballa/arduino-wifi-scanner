@@ -45,7 +45,7 @@ class Screen {
 public:
   Screen(TFT_eSPI &lcd): _lcd(lcd), _bgColor(TFT_BLACK), _widget(NULL) {};
 
-  void setWidget(UIWidget *w) { _widget = w; };
+  void setWidget(UIWidget *w);
   UIWidget *getWidget() const { return _widget; };
 
   void render();

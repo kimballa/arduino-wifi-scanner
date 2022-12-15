@@ -1,7 +1,6 @@
 // (c) Copyright 2022 Aaron Kimball
 
 #include "uiwidgets.h"
-#include<dbg.h>
 
 void VScroll::remove(UIWidget *widget) {
   for (auto it = _entries.begin(); it != _entries.end(); it++) {
@@ -18,9 +17,12 @@ void VScroll::render(TFT_eSPI &lcd) {
   drawBackground(lcd);
   drawBorder(lcd);
 
+
   uint16_t scrollbarColor = _focused ? invertColor(_border_color) : _border_color;
   // X position of the left-most edge of the scrollbar.
   int16_t scrollbarX = _x + _w - VSCROLL_SCROLLBAR_W;
+
+  // TODO(aaron): Compensate for padding and/or border when drawing scrollbar.
 
   // Vertical bars for sides of scrollbar.
   lcd.drawFastVLine(scrollbarX, _y, _h, scrollbarColor);
@@ -77,6 +79,7 @@ void VScroll::cascadeBoundingBox() {
   } else if (_border_flags & BORDER_ROUNDED) {
     childW -= BORDER_ROUNDED_INNER_MARGIN;
   }
+  childW -= _paddingL + _paddingR; // Adjust width to compensate for user-specified padding.
 
   // Adjust width to provide room for the scrollbar.
   childW -= VSCROLL_SCROLLBAR_W + VSCROLL_SCROLLBAR_MARGIN;

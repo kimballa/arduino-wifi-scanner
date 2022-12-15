@@ -6,7 +6,7 @@
 // A "clickable" / selectable button.
 class Button : public UIWidget {
 public:
-  Button(): UIWidget(), _fontId(0), _color(TFT_WHITE), _btnLabel(NULL) {};
+  Button(const char *str=NULL): UIWidget(), _fontId(0), _color(TFT_WHITE), _btnLabel(str) {};
 
   void setText(const char *str) { _btnLabel = str; };
   const char *getText() const { return _btnLabel; };

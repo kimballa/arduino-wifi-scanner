@@ -28,8 +28,7 @@ protected:
 
 class StrLabel: public Label {
 public:
-  StrLabel(): Label(), _str(NULL) { };
-  StrLabel(const char *text): Label(), _str(text) { };
+  StrLabel(const char *text=NULL): Label(), _str(text) { };
 
   virtual void renderText(TFT_eSPI &lcd);
 
@@ -45,8 +44,7 @@ private:
 
 class IntLabel: public Label {
 public:
-  IntLabel(): Label(), _val(0) { };
-  IntLabel(long x): Label(), _val(x) { };
+  IntLabel(long x=0): Label(), _val(x) { };
 
   virtual void renderText(TFT_eSPI &lcd);
 
@@ -63,9 +61,7 @@ private:
 
 class FloatLabel: public Label {
 public:
-  FloatLabel(): Label(), _val(0.0f), _maxDecimalDigits(7) { };
-  FloatLabel(float f): Label(), _val(f), _maxDecimalDigits(7) { };
-  FloatLabel(float f, uint8_t d): Label(), _val(f), _maxDecimalDigits(d) { };
+  FloatLabel(float f=0.0f, uint8_t d=7): Label(), _val(f), _maxDecimalDigits(d) { };
 
   virtual void renderText(TFT_eSPI &lcd);
 

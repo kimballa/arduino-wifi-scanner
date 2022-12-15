@@ -20,14 +20,14 @@ void Button::render(TFT_eSPI &lcd) {
     lcd.setTextColor(_color);
   }
 
-  lcd.drawText(_btnLabel, childX + BORDER_ROUNDED_INNER_MARGIN, childY + BORDER_ROUNDED_INNER_MARGIN);
+  lcd.drawString(_btnLabel, childX + BORDER_ROUNDED_INNER_MARGIN, childY + BORDER_ROUNDED_INNER_MARGIN);
 }
 
 int16_t Button::getContentWidth(TFT_eSPI &lcd) const {
-  lcd.textWidth(_btnLabel, _fontId) + 2 * BORDER_ROUNDED_INNER_MARGIN;
+  return lcd.textWidth(_btnLabel, _fontId) + 2 * BORDER_ROUNDED_INNER_MARGIN;
 }
 
 int16_t Button::getContentHeight(TFT_eSPI &lcd) const {
-  lcd.fontHeight(_fontId) + 2 * BORDER_ROUNDED_INNER_MARGIN;
+  return lcd.fontHeight(_fontId) + 2 * BORDER_ROUNDED_INNER_MARGIN;
 }
 

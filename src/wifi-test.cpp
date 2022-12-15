@@ -16,66 +16,64 @@
 TFT_eSPI tft;
 
 Screen screen(tft);
-String msg1("First Col label.");
-String msg2("Second Col label.");
-String msg3("And the mightly THIRD row label.");
-IntLabel label1(211);
-IntLabel label2(312);
-FloatLabel label3(3.14159);
-Rows rows(3);
-Cols midCols(3);
-VScroll vscroll;
+// The screen is a set of rows: row of buttons, then the main vscroll.
+Rows rowLayout(2); // 2 rows.
+// the top row is a set of buttons.
+Cols topRow(4); // 4 columns
+const char *detailsStr = "Details";
+const char *rescanStr = "Refresh";
+const char *fooStr = "Foo!";
+Button detailsButton(detailsStr);
+Button rescanButton(rescanStr);
+Button fooButton(fooStr);
+// The main focus of the screen is a scrollable list of wifi SSIDs.
+VScroll wifiListScroll;
 
-IntLabel numLabels[20];
+
+const char *testStr = "Testing";
+StrLabel testLabel(testStr);
 
 void setup() {
   DBGSETUP();
+  //while (!Serial) { delay(10); }
 
   tft.begin();
   tft.setRotation(3);
   tft.fillScreen(TFT_BLACK);
   tft.setTextFont(2); // 0 for 8px, 2 for 16px.
-  tft.setTextColor(TFT_RED);
-  tft.drawString("This is a test", 0, 0);
+  tft.setTextColor(TFT_WHITE);
+  tft.drawString("Wifi analyzer starting up...", 0, 0);
 
   // Set WiFi to station mode and disconnect from an AP if it was previously connected
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
 
-  DBGPRINT("Setup done");
+  screen.setWidget(&rowLayout);
+  rowLayout.setRow(0, &topRow, 30);
+  rowLayout.setRow(1, &wifiListScroll, EQUAL); // VScroll expands to fill available space.
 
-  screen.setWidget(&rows);
-  rows.setRow(1, &midCols, EQUAL);
-  rows.setFixedHeight(EQUAL);
+  // topRow is a Cols that holds some buttons.
+  topRow.setBorder(BORDER_BOTTOM, TFT_BLUE);
+  topRow.setBackground(TFT_LIGHTGREY);
+  topRow.setPadding(0, 0, 4, 2); // 4 px padding top; 2 px on bottom b/c we get padding from border.
+  topRow.setColumn(0, &detailsButton, 70);
+  topRow.setColumn(1, &rescanButton, 70);
+  topRow.setColumn(2, &fooButton, 50);
+  topRow.setColumn(3, NULL, EQUAL); // Rest of space to the right is empty
 
-  midCols.setColumn(0, &label1, 50);
-  midCols.setColumn(1, &vscroll, EQUAL);
-  midCols.setColumn(2, &label3, EQUAL);
+  detailsButton.setColor(TFT_BLUE);
+  detailsButton.setPadding(4, 4, 0, 0);
+  detailsButton.setFocus(true);
 
-  label1.setBorder(BORDER_BOTTOM | BORDER_RIGHT);
+  rescanButton.setColor(TFT_BLUE);
+  rescanButton.setPadding(4, 4, 0, 0);
 
-  /*
-  label2.setColor(TFT_BLACK);
-  label2.setBackground(TFT_GREEN);
-  label2.setBorder(BORDER_ROUNDED, TFT_RED);
-  */
+  fooButton.setColor(TFT_BLUE);
+  fooButton.setPadding(4, 4, 0, 0);
 
-  label3.setBorder(BORDER_RECT);
 
-  for (int i = 0; i < 20; i++) {
-    numLabels[i].setValue(i);
-    if (i % 2 == 0) {
-      numLabels[i].setBackground(TFT_NAVY);
-    } else {
-      numLabels[i].setBackground(TFT_ORANGE);
-      numLabels[i].setColor(TFT_BLACK);
-    }
-    numLabels[i].setPadding(2,2,2,2);
-    vscroll.add(&(numLabels[i]));
-  }
-
-  vscroll.scrollTo(5);
+  wifiListScroll.add(&testLabel);
 
   screen.render();
 }

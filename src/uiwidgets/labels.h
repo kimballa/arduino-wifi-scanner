@@ -28,7 +28,7 @@ protected:
 
 class StrLabel: public Label {
 public:
-  StrLabel(): Label(), _str() { };
+  StrLabel(): Label(), _str(NULL) { };
   StrLabel(const char *text): Label(), _str(text) { };
 
   virtual void renderText(TFT_eSPI &lcd);

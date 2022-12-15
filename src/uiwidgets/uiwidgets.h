@@ -139,5 +139,6 @@ private:
 #include "row_col.h"
 #include "labels.h"
 #include "vscroll.h"
+#include "button.h"
 
 #endif // __UI_WIDGETS_H

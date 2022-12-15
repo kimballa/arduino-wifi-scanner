@@ -2,11 +2,10 @@
 * Make UI widget library
   * (ok) Panel (nestable/composable; no visible chrome by default; holds another elt)
     * (ok) Columns
-  * VScroll Widget
-    * Entry element
-    * Scrollbar
-  * Menu
-  * Button
+  * (ok) VScroll Widget
+    * (ok) Entry element
+    * (ok) Scrollbar
+  * (ok) Button
   * (ok) Text line
     * (ok) Str text line
     * (ok) Int text line
@@ -15,6 +14,10 @@
   * (ok) All items can be shown inverted for focus
   * Add invalidateElem(UIWidget*) method to redraw only the components of the screen that
     get composited into the rect for that widget.
+  * clearAllFocus() should hierarchically reset all focus to false.
+  * need to have 'tab order' to walk through things the user can select?
+  * Do we need actions like Button::onClick() ? Or should that just get managed manually?
+  * Menu ?
   * Checkbox ?
   * Radio button ?
 

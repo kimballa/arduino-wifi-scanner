@@ -18,6 +18,7 @@ public:
   UIWidget *getWidget() const { return _widget; };
 
   void render();
+  void renderWidget(UIWidget *widget);
 
   int16_t getWidth() const { return _lcd.width(); };
   int16_t getHeight() const { return _lcd.height(); };

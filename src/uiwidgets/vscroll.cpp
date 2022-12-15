@@ -142,3 +142,35 @@ void VScroll::scrollDown() {
   }
 }
 
+bool VScroll::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
+  if (NULL == widget) {
+    return false;
+  } else if (this == widget) {
+    render(lcd);
+    return true;
+  } else if (containsWidget(widget)) {
+    // This widget thinks its inside our bounding box. It's definitely a child of this
+    // widget, but depending on where we're scrolled to, this may not actually be visible.
+
+    // The containment algorithm is flaky in that containsWidget() will have already returned true
+    // before we enter this method. Meaning our parent/ancestor widget(s) may have called
+    // drawBackgroundUnderWidget() and made a rectangle in our draw area. If we then called
+    // pEntry->redrawChildWidget() for the appropriate slice of our view, there's a possibility
+    // that it wouldn't draw (because the invalidated widget thinks its in a space on our screen
+    // but is actually scrolled out of view, and a different widget is actually in that spot).
+    // So we do a full re-render of the pEntry with the bounding box that contains 'widget'.
+
+    // Iterate through all the entries and check.
+    for (unsigned int i = _topIdx; i < _lastIdx; i++) {
+      UIWidget *pEntry = _entries[i];
+      if (pEntry != NULL && pEntry->containsWidget(widget)) {
+        // Found a visible row that applies to this widget.
+        drawBackgroundUnderWidget(widget, lcd);
+        pEntry->render(lcd);
+        return true;
+      }
+    }
+  }
+
+  return false;
+}

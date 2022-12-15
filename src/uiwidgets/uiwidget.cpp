@@ -90,6 +90,45 @@ void UIWidget::getPadding(int16_t &padL, int16_t &padR, int16_t &padT, int16_t &
   padB = _paddingBottom;
 }
 
+bool UIWidget::containsWidget(UIWidget *widget) const {
+  if (NULL == widget) {
+    return false;
+  } else if (widget == this) {
+    return true;
+  }
+
+  if (widget->_x >= _x && widget->_x < _x + _w && widget->_y >= _y && widget->_y < _y + _h) {
+    return true; // top-left corner is in.
+  }
+  /* Widgets must be fully nested within other widgets, there are no "partial overlaps."
+   * Therefore, the top-left corner is inside this widget's BB iff the whole widget is inside this
+   * one. Hanging onto these additional checks for now, just in case though...
+   * TODO(aaron): Remove once we're confident they're not needed.
+  else if (w->_x + w->_w - 1 >= _x && w->_x + w->_w - 1 < _x + _w && w->_y >= _y && w->_y < _y + _h) {
+    return true; // top-right corner
+  } else if (w->_x >= _x && w->_x < _x + _w && w->_y + w->_h - 1 >= _y && w->_y + w->_h - 1< _y + _h) {
+    return true; // bottom-left corner is in.
+  } else if (w->_x + w->_w - 1 >= _x && w->_x + w->_w - 1 < _x + _w && w->_y + w->_h - 1 >= _y
+      && w->_y + w->_h - 1 < _y + _h) {
+    return true; // bottom-right corner.
+  }
+  */
+
+  return false;
+}
+
+bool UIWidget::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
+  // Default implementation for widgets that do not contain nested/child widgets.
+  if (NULL == widget) {
+    return false;
+  } else if (this == widget) {
+    render(lcd);
+    return true;
+  }
+
+  return false;
+}
+
 void UIWidget::getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t &childW, int16_t &childH) {
   // The bounding box for a whole-content child is the same as that of this object,
   // unless there's a border, in which case we need to give that border some breathing room.
@@ -175,6 +214,21 @@ int16_t UIWidget::addBorderHeight(int16_t contentHeight) const {
   return contentHeight;
 }
 
+/**
+ * Fill in the background that this widget would render underneath another widget being redrawn.
+ */
+void UIWidget::drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd) {
+  if (NULL == widget) {
+    return;
+  }
+
+  if (_bg_color == TRANSPARENT_COLOR) {
+    return; // Nothing to draw.
+  }
+
+  uint16_t bg = _focused ? invertColor(_bg_color) : _bg_color;
+  lcd.fillRect(widget->_x, widget->_y, widget->_w, widget->_h, bg);
+}
 
 
 //////////////////////////// Panel /////////////////////
@@ -217,3 +271,16 @@ int16_t Panel::getContentHeight(TFT_eSPI &lcd) const {
   return addBorderHeight(h);
 }
 
+bool Panel::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
+  if (NULL == widget) {
+    return false;
+  } else if (widget == this) {
+    render(lcd);
+    return true;
+  } else if (containsWidget(widget) && NULL != _child) {
+    drawBackgroundUnderWidget(widget, lcd);
+    return _child->redrawChildWidget(widget, lcd);
+  }
+
+  return false;
+}

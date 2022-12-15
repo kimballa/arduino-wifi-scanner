@@ -40,6 +40,8 @@ public:
   void setItemHeight(int16_t newItemHeight);
   int16_t getItemHeight() const { return _itemHeight; };
 
+  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd);
+
 private:
   vector<UIWidget*> _entries;
   int16_t _itemHeight; // Fixed height for all elements.

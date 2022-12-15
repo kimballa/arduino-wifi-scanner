@@ -12,7 +12,7 @@
     * (ok) Float text line
   * (ok) All items can have border (square or rounded; viz on each side independently or full-around.)
   * (ok) All items can be shown inverted for focus
-  * Add invalidateElem(UIWidget*) method to redraw only the components of the screen that
+  * (ok) Add invalidateElem(UIWidget*) method to redraw only the components of the screen that
     get composited into the rect for that widget.
   * clearAllFocus() should hierarchically reset all focus to false.
   * need to have 'tab order' to walk through things the user can select?
@@ -23,6 +23,17 @@
 
 
 * Bug: VScroll shouldn't let you scroll down past the last "full page."
+* Improvement: VScroll re-render should not clear/redraw the whole scroll-bar;
+  it should just "un-draw" the current slider box and then add the new square.
+  ... this would require a big refactor: the parent widgets would need to know to
+  invalidate the narrower rect that contains the VScroll elements, not the scrollbar too.
+  And the VScroll's own redrawChildWidget() would need to take different logic than just
+  blindly invoking its own render().
+* Improvement: scrollUp() and scrollDown() should momentarily make the appropriate caret
+  turn solid; they should also (be able to) manage the re-rendering.
+  * alt: add methods to highlight the carets, and have the "click down" event in the button handler
+    highlight the caret (and unhighlight it on release -- automatic given entire VScroll is
+    currently redrawn).
 
 * Main UI
   * (ok) List all wifi channels in a scrollable thingie

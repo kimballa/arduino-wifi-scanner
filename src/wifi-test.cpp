@@ -20,8 +20,8 @@ static void scanWifi();
 TFT_eSPI tft;
 
 static constexpr int16_t SSID_WIDTH = 120;
-static constexpr int16_t RSSI_WIDTH = 40;
 static constexpr int16_t CHAN_WIDTH = 40;
+static constexpr int16_t RSSI_WIDTH = 40;
 
 Screen screen(tft);
 // The screen is a set of rows: row of buttons, then the main vscroll.
@@ -39,12 +39,12 @@ static VScroll wifiListScroll;
 static Panel wifiScrollContainer; // Wrap VScroll in a container for padding.
 
 static const char *hdrSsidStr = "SSID";
-static const char *hdrRssiStr = "RSSI";
 static const char *hdrChannelStr = "Chan";
+static const char *hdrRssiStr = "RSSI";
 
 static StrLabel hdrSsid = StrLabel(hdrSsidStr);
-static StrLabel hdrRssi = StrLabel(hdrRssiStr);
 static StrLabel hdrChannel = StrLabel(hdrChannelStr);
+static StrLabel hdrRssi = StrLabel(hdrRssiStr);
 static Cols dataHeaderRow(3); // 3 columns.
 
 // physical pushbuttons
@@ -53,20 +53,18 @@ static vector<uint8_t> buttonGpioPins;
 
 // 5-way hat "up" -- scroll up the list.
 static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
-  DBGPRINTI("scroll up handler:", btnState);
   if (btnState == BTN_PRESSED) { return; };
 
   wifiListScroll.scrollUp();
-  screen.render(); // TODO(aaron): Only invalidate the scrollbox.
+  screen.renderWidget(&wifiListScroll);
 }
 
 // 5-way hat "down" -- scroll down the list.
 static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
-  DBGPRINTI("scroll down handler:", btnState);
   if (btnState == BTN_PRESSED) { return; };
 
   wifiListScroll.scrollDown();
-  screen.render(); // TODO(aaron): Only invalidate the scrollbox.
+  screen.renderWidget(&wifiListScroll);
 }
 
 void setup() {
@@ -78,6 +76,7 @@ void setup() {
   buttonGpioPins.push_back(WIO_5S_LEFT);  // Button 2
   buttonGpioPins.push_back(WIO_5S_RIGHT); // Button 3
   buttonGpioPins.push_back(WIO_5S_PRESS); // Button 4
+  // TODO(aaron): Add buttons for 3 top-side buttons.
 
   for (auto pin: buttonGpioPins) {
     pinMode(pin, INPUT_PULLUP);
@@ -85,7 +84,7 @@ void setup() {
 
   buttons.emplace_back(0, scrollUpHandler);
   buttons.emplace_back(1, scrollDownHandler);
-
+  // TODO(aaron): Add Button / handlers for btns 2--4.
 
   tft.begin();
   tft.setRotation(3);
@@ -127,8 +126,8 @@ void setup() {
   fooButton.setPadding(4, 4, 0, 0);
 
   dataHeaderRow.setColumn(0, &hdrSsid, SSID_WIDTH);
-  dataHeaderRow.setColumn(1, &hdrRssi, RSSI_WIDTH);
-  dataHeaderRow.setColumn(2, &hdrChannel, CHAN_WIDTH);
+  dataHeaderRow.setColumn(1, &hdrChannel, CHAN_WIDTH);
+  dataHeaderRow.setColumn(2, &hdrRssi, RSSI_WIDTH);
   dataHeaderRow.setBackground(TFT_BLUE);
 
   hdrSsid.setBackground(TFT_BLUE);
@@ -146,8 +145,8 @@ void setup() {
 
 static vector<String> ssids;
 static vector<StrLabel *> ssidLabels;
-static vector<IntLabel *> rssiLabels;
 static vector<IntLabel *> chanLabels;
+static vector<IntLabel *> rssiLabels;
 static vector<Cols *> wifiRows; // Each row is a Cols for (ssid, rssi)
 
 static void makeWifiRow(int wifiIdx) {
@@ -156,16 +155,16 @@ static void makeWifiRow(int wifiIdx) {
   ssid->setFont(2);
   ssidLabels.push_back(ssid);
 
-  IntLabel *rssi = new IntLabel(WiFi.RSSI(wifiIdx));
-  rssiLabels.push_back(rssi);
-
   IntLabel *chan = new IntLabel(WiFi.channel(wifiIdx));
   chanLabels.push_back(chan);
 
+  IntLabel *rssi = new IntLabel(WiFi.RSSI(wifiIdx));
+  rssiLabels.push_back(rssi);
+
   Cols *wifiRow = new Cols(3);
   wifiRow->setColumn(0, ssid, SSID_WIDTH);
-  wifiRow->setColumn(1, rssi, RSSI_WIDTH);
-  wifiRow->setColumn(2, chan, CHAN_WIDTH);
+  wifiRow->setColumn(1, chan, CHAN_WIDTH);
+  wifiRow->setColumn(2, rssi, RSSI_WIDTH);
   wifiRows.push_back(wifiRow);
 
   wifiListScroll.add(wifiRow);
@@ -203,15 +202,4 @@ static void pollButtons() {
 void loop() {
   pollButtons();
   delay(10);
-  /*
-  DBGPRINT("x --- width");
-  DBGPRINT(label1.getX());
-  DBGPRINTI("      ", label1.getWidth());
-  DBGPRINT(label2.getX());
-  DBGPRINTI("      ", label2.getWidth());
-  DBGPRINT(label3.getX());
-  DBGPRINTI("      ", label3.getWidth());
-  */
-
-  //DBGPRINTI("vscroll h", vscroll.getHeight());
 }

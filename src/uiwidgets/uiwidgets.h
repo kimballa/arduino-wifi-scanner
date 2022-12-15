@@ -48,6 +48,7 @@ constexpr uint16_t invertColor(uint16_t original565color) {
 constexpr uint16_t TRANSPARENT_COLOR = TFT_TRANSPARENT;
 constexpr uint16_t BG_NONE = TRANSPARENT_COLOR;
 
+class Screen; // fwd-declaration needed.
 
 /** Base UIWidget class that all widget instances extend. */
 class UIWidget {
@@ -90,9 +91,17 @@ public:
   void setPadding(int16_t padL, int16_t padR, int16_t padT, int16_t padB);
   void getPadding(int16_t &padL, int16_t &padR, int16_t &padT, int16_t &padB) const;
 
+  // Returns true if 'widget' is within this widget's containment / draw area.
+  bool containsWidget(UIWidget *widget) const;
+  // Redraw only the part of the screen contained by widget 'widget'.
+  // Returns true if we handled the redraw.
+  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd);
+
 protected:
   void drawBorder(TFT_eSPI &lcd);
   void drawBackground(TFT_eSPI &lcd);
+  void drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd);
+
   /** Get area bounding box available for rendering within the context of any border or other
    * padding that belongs to this widget.
    */
@@ -114,6 +123,8 @@ protected:
 
   // Additional user controlled interior padding.
   int16_t _paddingL, _paddingR, _paddingTop, _paddingBottom;
+
+  friend class Screen;
 };
 
 /**
@@ -130,6 +141,7 @@ public:
   virtual void cascadeBoundingBox();
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
+  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd);
 
 private:
   UIWidget *_child;

@@ -16,13 +16,13 @@ constexpr int16_t DEFAULT_VSCROLL_ITEM_HEIGHT = 16;
 class VScroll : public UIWidget {
 public:
   VScroll(): UIWidget(), _entries(), _itemHeight(DEFAULT_VSCROLL_ITEM_HEIGHT),
-      _topIdx(0), _lastIdx(0), _isDirty(true) {};
+      _topIdx(0), _lastIdx(0) {};
 
   // Add the specified widget to the end of the list.
-  void add(UIWidget *widget) { _entries.push_back(widget); _isDirty = true; };
+  void add(UIWidget *widget) { _entries.push_back(widget); cascadeBoundingBox(); };
   // Remove the specified widget from the list.
   void remove(UIWidget *widget);
-  void clear() { _entries.clear(); _isDirty = true; }; // Remove all widgets from the list.
+  void clear() { _entries.clear(); cascadeBoundingBox(); }; // Remove all widgets from the list.
 
   // Return number of entries in the list.
   unsigned int getCount() const { return _entries.size(); };
@@ -45,7 +45,6 @@ private:
   int16_t _itemHeight; // Fixed height for all elements.
   unsigned int _topIdx; // Index of the first element to display.
   unsigned int _lastIdx; // Index of the last visible element.
-  bool _isDirty;
 };
 
 

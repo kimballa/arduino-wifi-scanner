@@ -8,52 +8,13 @@ void VScroll::remove(UIWidget *widget) {
     if (*it == widget) {
       // Erase the element at cur iterator position.
       _entries.erase(it);
-      _isDirty = true;
+      cascadeBoundingBox();
       return; // All done.
     }
   }
 }
 
 void VScroll::render(TFT_eSPI &lcd) {
-  if (_isDirty) {
-    // Recompute bounding boxes for visible items.
-    int16_t childX, childY, childW, childH;
-    getChildAreaBoundingBox(childX, childY, childW, childH);
-    // Because the scrollbar is on the right and clobbers the border there, we disregard childW
-    // and recalculate it ourselves.
-    childW = _w;
-    // Calculate width adjustment for left-side border.
-    if (_border_flags & BORDER_LEFT) {
-      childW -= BORDER_ACTIVE_INNER_MARGIN;
-    } else if (_border_flags & BORDER_ROUNDED) {
-      childW -= BORDER_ROUNDED_INNER_MARGIN;
-    }
-
-    // Adjust width to provide room for the scrollbar.
-    childW -= VSCROLL_SCROLLBAR_W + VSCROLL_SCROLLBAR_MARGIN;
-
-    unsigned int idx = 0;
-    for (auto it = _entries.begin(); it < _entries.end() && childH > 0; idx++, it++) {
-      if (idx < _topIdx) {
-        // Not part of the visible set of entries; just skip it.
-        continue;
-      }
-
-      UIWidget *pEntry = *it;
-      if (pEntry == NULL) {
-        // Empty entry; takes zero height.
-        continue;
-      }
-
-      pEntry->setBoundingBox(childX, childY, childW, min(_itemHeight, childH));
-      childY += _itemHeight; // Next item is further down by 1 item height.
-      childH -= _itemHeight; // Next item's available height reduced by 1 item height.
-    }
-
-    _lastIdx = idx;
-    _isDirty = false;
-  }
-
   drawBackground(lcd);
   drawBorder(lcd);
 
@@ -104,13 +65,41 @@ void VScroll::render(TFT_eSPI &lcd) {
 }
 
 void VScroll::cascadeBoundingBox() {
-  // We do not perform a static cascade of our bounding box; this must be done
-  // at render time when we have access to the `lcd` object and know exactly which
-  // objects must be viewed.
+  // Recompute bounding boxes for visible items.
+  int16_t childX, childY, childW, childH;
+  getChildAreaBoundingBox(childX, childY, childW, childH);
+  // Because the scrollbar is on the right and clobbers the border there, we disregard childW
+  // and recalculate it ourselves.
+  childW = _w;
+  // Calculate width adjustment for left-side border.
+  if (_border_flags & BORDER_LEFT) {
+    childW -= BORDER_ACTIVE_INNER_MARGIN;
+  } else if (_border_flags & BORDER_ROUNDED) {
+    childW -= BORDER_ROUNDED_INNER_MARGIN;
+  }
 
-  // This method is called when our own bounding box has changed, which makes prior
-  // internal layout assumptions dirty.
-  _isDirty = true;
+  // Adjust width to provide room for the scrollbar.
+  childW -= VSCROLL_SCROLLBAR_W + VSCROLL_SCROLLBAR_MARGIN;
+
+  unsigned int idx = 0;
+  for (auto it = _entries.begin(); it < _entries.end() && childH > 0; idx++, it++) {
+    if (idx < _topIdx) {
+      // Not part of the visible set of entries; just skip it.
+      continue;
+    }
+
+    UIWidget *pEntry = *it;
+    if (pEntry == NULL) {
+      // Empty entry; takes zero height.
+      continue;
+    }
+
+    pEntry->setBoundingBox(childX, childY, childW, min(_itemHeight, childH));
+    childY += _itemHeight; // Next item is further down by 1 item height.
+    childH -= _itemHeight; // Next item's available height reduced by 1 item height.
+  }
+
+  _lastIdx = idx;
 }
 
 int16_t VScroll::getContentWidth(TFT_eSPI &lcd) const {
@@ -127,13 +116,13 @@ void VScroll::setItemHeight(int16_t newItemHeight) {
     _itemHeight = DEFAULT_VSCROLL_ITEM_HEIGHT;
   }
 
-  _isDirty = true;
+  cascadeBoundingBox();
 }
 
 void VScroll::scrollUp() {
   if (_topIdx > 0) {
     _topIdx--;
-    _isDirty = true;
+    cascadeBoundingBox();
   }
 }
 
@@ -141,14 +130,14 @@ void VScroll::scrollUp() {
 void VScroll::scrollTo(unsigned int idx) {
   if (idx < _entries.size()) {
     _topIdx = idx;
-    _isDirty = true;
+    cascadeBoundingBox();
   }
 }
 
 void VScroll::scrollDown() {
   if (_topIdx < _entries.size() - 1) {
     _topIdx++;
-    _isDirty = true;
+    cascadeBoundingBox();
   }
 }
 

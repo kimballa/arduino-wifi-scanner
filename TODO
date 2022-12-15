@@ -21,8 +21,11 @@
   * Checkbox ?
   * Radio button ?
 
+
+* Bug: VScroll shouldn't let you scroll down past the last "full page."
+
 * Main UI
-  * List all wifi channels in a scrollable thingie
-  * Scroll thru the wifi channels
+  * (ok) List all wifi channels in a scrollable thingie
+  * (ok) Scroll thru the wifi channels
   * Select a wifi channel > See a detail page.
 

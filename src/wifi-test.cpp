@@ -5,6 +5,8 @@
 #include<Arduino.h>
 #include<rpcWiFi.h>
 #include<TFT_eSPI.h>
+#include<debounce.h>
+
 #include "uiwidgets/uiwidgets.h"
 
 #define DEBUG
@@ -17,37 +19,73 @@ static void scanWifi();
 
 TFT_eSPI tft;
 
-constexpr int16_t SSID_WIDTH = 120;
-constexpr int16_t RSSI_WIDTH = 40;
-constexpr int16_t CHAN_WIDTH = 40;
+static constexpr int16_t SSID_WIDTH = 120;
+static constexpr int16_t RSSI_WIDTH = 40;
+static constexpr int16_t CHAN_WIDTH = 40;
 
 Screen screen(tft);
 // The screen is a set of rows: row of buttons, then the main vscroll.
-Rows rowLayout(3); // 3 rows.
+static Rows rowLayout(3); // 3 rows.
 // the top row is a set of buttons.
-Cols topRow(4); // 4 columns
-const char *detailsStr = "Details";
-const char *rescanStr = "Refresh";
-const char *fooStr = "Foo!";
-UIButton detailsButton(detailsStr);
-UIButton rescanButton(rescanStr);
-UIButton fooButton(fooStr);
+static Cols topRow(4); // 4 columns
+static const char *detailsStr = "Details";
+static const char *rescanStr = "Refresh";
+static const char *fooStr = "Foo!";
+static UIButton detailsButton(detailsStr);
+static UIButton rescanButton(rescanStr);
+static UIButton fooButton(fooStr);
 // The main focus of the screen is a scrollable list of wifi SSIDs.
-VScroll wifiListScroll;
-Panel wifiScrollContainer; // Wrap VScroll in a container for padding.
+static VScroll wifiListScroll;
+static Panel wifiScrollContainer; // Wrap VScroll in a container for padding.
 
-const char *hdrSsidStr = "SSID";
-const char *hdrRssiStr = "RSSI";
-const char *hdrChannelStr = "Chan";
+static const char *hdrSsidStr = "SSID";
+static const char *hdrRssiStr = "RSSI";
+static const char *hdrChannelStr = "Chan";
 
-StrLabel hdrSsid = StrLabel(hdrSsidStr);
-StrLabel hdrRssi = StrLabel(hdrRssiStr);
-StrLabel hdrChannel = StrLabel(hdrChannelStr);
-Cols dataHeaderRow(3); // 3 columns.
+static StrLabel hdrSsid = StrLabel(hdrSsidStr);
+static StrLabel hdrRssi = StrLabel(hdrRssiStr);
+static StrLabel hdrChannel = StrLabel(hdrChannelStr);
+static Cols dataHeaderRow(3); // 3 columns.
+
+// physical pushbuttons
+static vector<Button> buttons;
+static vector<uint8_t> buttonGpioPins;
+
+// 5-way hat "up" -- scroll up the list.
+static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
+  DBGPRINTI("scroll up handler:", btnState);
+  if (btnState == BTN_PRESSED) { return; };
+
+  wifiListScroll.scrollUp();
+  screen.render(); // TODO(aaron): Only invalidate the scrollbox.
+}
+
+// 5-way hat "down" -- scroll down the list.
+static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
+  DBGPRINTI("scroll down handler:", btnState);
+  if (btnState == BTN_PRESSED) { return; };
+
+  wifiListScroll.scrollDown();
+  screen.render(); // TODO(aaron): Only invalidate the scrollbox.
+}
 
 void setup() {
   DBGSETUP();
   //while (!Serial) { delay(10); }
+
+  buttonGpioPins.push_back(WIO_5S_UP);    // Button 0
+  buttonGpioPins.push_back(WIO_5S_DOWN);  // Button 1
+  buttonGpioPins.push_back(WIO_5S_LEFT);  // Button 2
+  buttonGpioPins.push_back(WIO_5S_RIGHT); // Button 3
+  buttonGpioPins.push_back(WIO_5S_PRESS); // Button 4
+
+  for (auto pin: buttonGpioPins) {
+    pinMode(pin, INPUT_PULLUP);
+  }
+
+  buttons.emplace_back(0, scrollUpHandler);
+  buttons.emplace_back(1, scrollDownHandler);
+
 
   tft.begin();
   tft.setRotation(3);
@@ -106,11 +144,11 @@ void setup() {
   screen.render();
 }
 
-vector<String> ssids;
-vector<StrLabel *> ssidLabels;
-vector<IntLabel *> rssiLabels;
-vector<IntLabel *> chanLabels;
-vector<Cols *> wifiRows; // Each row is a Cols for (ssid, rssi)
+static vector<String> ssids;
+static vector<StrLabel *> ssidLabels;
+static vector<IntLabel *> rssiLabels;
+static vector<IntLabel *> chanLabels;
+static vector<Cols *> wifiRows; // Each row is a Cols for (ssid, rssi)
 
 static void makeWifiRow(int wifiIdx) {
   ssids.push_back(WiFi.SSID(wifiIdx));
@@ -156,9 +194,15 @@ static void scanWifi() {
 }
 
 
+static void pollButtons() {
+  for (unsigned int i = 0; i < buttons.size(); i++) {
+    buttons[i].update(digitalRead(buttonGpioPins[i]));
+  }
+}
 
 void loop() {
-  delay(1000);
+  pollButtons();
+  delay(10);
   /*
   DBGPRINT("x --- width");
   DBGPRINT(label1.getX());

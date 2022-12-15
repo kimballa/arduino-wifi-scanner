@@ -50,7 +50,7 @@ void VScroll::render(TFT_eSPI &lcd) {
   // Use MacOS-style fixed-size box whose position is proportional to the position of the viewing
   // window. The viewing window is at the "bottom" is when the last screenful of rows are shown,
   // so remove that many items from _elements.size() when calculating this percentage.
-  float frac = (float)_topIdx / max(1, (signed)_entries.size() - (_h / _itemHeight));
+  float frac = min(1.0, (float)_topIdx / max(1, (signed)_entries.size() - (_h / _itemHeight)));
   int16_t boxStart = frac * (_h - 3 * scrollBoxWidgetHeight);
   lcd.fillRect(scrollbarX, _y + scrollBoxWidgetHeight + boxStart,
       VSCROLL_SCROLLBAR_W, scrollBoxWidgetHeight, scrollbarColor);
@@ -120,26 +120,40 @@ void VScroll::setItemHeight(int16_t newItemHeight) {
   cascadeBoundingBox();
 }
 
-void VScroll::scrollUp() {
+bool VScroll::scrollUp() {
   if (_topIdx > 0) {
     _topIdx--;
     cascadeBoundingBox();
+    return true;
   }
+
+  return false;
 }
 
 // specify the idx of the elem to show @ the top of the scroll box.
-void VScroll::scrollTo(unsigned int idx) {
+bool VScroll::scrollTo(unsigned int idx) {
   if (idx < _entries.size()) {
     _topIdx = idx;
     cascadeBoundingBox();
+    return true;
   }
+
+  return false;
 }
 
-void VScroll::scrollDown() {
-  if (_topIdx < _entries.size() - 1) {
-    _topIdx++;
-    cascadeBoundingBox();
+bool VScroll::scrollDown() {
+  if (_topIdx >= _entries.size() - 1) {
+    // Hard limit; cannot scroll past final element in vector.
+    return false;
+  } else if (_lastIdx >= _entries.size()) {
+    // Should not let user scroll down past the last "full page".
+    return false;
   }
+
+  // We can continue to scroll.
+  _topIdx++;
+  cascadeBoundingBox();
+  return true;
 }
 
 bool VScroll::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {

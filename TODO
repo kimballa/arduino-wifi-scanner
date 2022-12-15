@@ -22,7 +22,6 @@
   * Radio button ?
 
 
-* Bug: VScroll shouldn't let you scroll down past the last "full page."
 * Improvement: VScroll re-render should not clear/redraw the whole scroll-bar;
   it should just "un-draw" the current slider box and then add the new square.
   ... this would require a big refactor: the parent widgets would need to know to

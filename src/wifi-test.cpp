@@ -2,18 +2,24 @@
 //
 // Test the wifi functionality.
 
+// C/C++ includes
+#include<cstring>
+
+// Arduino
 #include<Arduino.h>
+
+// Libraries
 #include<rpcWiFi.h>
 #include<TFT_eSPI.h>
 #include<debounce.h>
-
-#include "uiwidgets/uiwidgets.h"
 
 #define DEBUG
 #define DBG_PRETTY_FUNCTIONS
 //#define DBG_WAIT_FOR_CONNECT
 //#define DBG_START_PAUSED
 #include<dbg.h>
+
+#include "uiwidgets/uiwidgets.h"
 
 static void scanWifi();
 
@@ -25,8 +31,8 @@ static constexpr int16_t RSSI_WIDTH = 40;
 
 Screen screen(tft);
 // The screen is a set of rows: row of buttons, then the main vscroll.
-static Rows rowLayout(3); // 3 rows.
-// the top row is a set of buttons.
+static Rows rowLayout(4); // 3 rows.
+// the top row (#0) is a set of buttons.
 static Cols topRow(4); // 4 columns
 static const char *detailsStr = "Details";
 static const char *rescanStr = "Refresh";
@@ -34,10 +40,8 @@ static const char *fooStr = "Foo!";
 static UIButton detailsButton(detailsStr);
 static UIButton rescanButton(rescanStr);
 static UIButton fooButton(fooStr);
-// The main focus of the screen is a scrollable list of wifi SSIDs.
-static VScroll wifiListScroll;
-static Panel wifiScrollContainer; // Wrap VScroll in a container for padding.
 
+// Row 1: Column headers for the main data table.
 static const char *hdrSsidStr = "SSID";
 static const char *hdrChannelStr = "Chan";
 static const char *hdrRssiStr = "RSSI";
@@ -47,24 +51,52 @@ static StrLabel hdrChannel = StrLabel(hdrChannelStr);
 static StrLabel hdrRssi = StrLabel(hdrRssiStr);
 static Cols dataHeaderRow(3); // 3 columns.
 
+// Row 2: The main focus of the screen is a scrollable list of wifi SSIDs.
+static VScroll wifiListScroll;
+static Panel wifiScrollContainer; // Wrap VScroll in a container for padding.
+
+// Row 3: Status / msg line.
+constexpr unsigned int MAX_STATUS_LINE_LEN = 80; // max len in chars; buffer is +1 more for '\0'
+static char statusLine[MAX_STATUS_LINE_LEN + 1];
+static StrLabel statusLineLabel = StrLabel(statusLine);
+
+
 // physical pushbuttons
 static vector<Button> buttons;
 static vector<uint8_t> buttonGpioPins;
+
+// Copies the specified text (up to 80 chars) into the status line buffer
+// and renders it to the bottom of the screen. If immediateRedraw=false,
+// the visible widget will not be updated until your next screen.render() call.
+void setStatusLine(const char *in, bool immediateRedraw=true) {
+  if (NULL == in) {
+    statusLine[0] = '\0';
+    return;
+  }
+
+  strncpy(statusLine, in, MAX_STATUS_LINE_LEN);
+  statusLine[MAX_STATUS_LINE_LEN] = '\0'; // Ensure null term if we copied 80 printable chars.
+  if (immediateRedraw) {
+    screen.renderWidget(&statusLineLabel);
+  }
+}
 
 // 5-way hat "up" -- scroll up the list.
 static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
   if (btnState == BTN_PRESSED) { return; };
 
-  wifiListScroll.scrollUp();
-  screen.renderWidget(&wifiListScroll);
+  if (wifiListScroll.scrollUp()) {
+    screen.renderWidget(&wifiListScroll);
+  }
 }
 
 // 5-way hat "down" -- scroll down the list.
 static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
   if (btnState == BTN_PRESSED) { return; };
 
-  wifiListScroll.scrollDown();
-  screen.renderWidget(&wifiListScroll);
+  if (wifiListScroll.scrollDown()) {
+    screen.renderWidget(&wifiListScroll);
+  }
 }
 
 void setup() {
@@ -106,6 +138,7 @@ void setup() {
   rowLayout.setRow(0, &topRow, 30);
   rowLayout.setRow(1, &dataHeaderRow, 16);
   rowLayout.setRow(2, &wifiScrollContainer, EQUAL); // VScroll expands to fill available space.
+  rowLayout.setRow(3, &statusLineLabel, 16);
 
   wifiScrollContainer.setChild(&wifiListScroll);
   wifiScrollContainer.setPadding(2, 2, 1, 1); // Add 1px padding around wifi list VScroll.
@@ -146,8 +179,13 @@ void setup() {
   hdrChannel.setColor(TFT_WHITE);
   hdrChannel.setPadding(0, 0, 2, 0);
 
+  statusLineLabel.setBackground(TFT_BLUE);
+  statusLineLabel.setPadding(2, 0, 2, 0);
+
   scanWifi();
   screen.render();
+
+  setStatusLine("Scan complete.");
 }
 
 static vector<String> ssids;
@@ -159,19 +197,25 @@ static vector<Cols *> wifiRows; // Each row is a Cols for (ssid, rssi)
 static void makeWifiRow(int wifiIdx) {
   ssids.push_back(WiFi.SSID(wifiIdx));
   StrLabel *ssid = new StrLabel(ssids[wifiIdx].c_str());
-  ssid->setFont(2);
+  ssid->setFont(2); // Use larger 16px font for SSID.
   ssidLabels.push_back(ssid);
 
   IntLabel *chan = new IntLabel(WiFi.channel(wifiIdx));
+  chan->setPadding(0, 0, 4, 0); // Push default small font to middle of row height.
   chanLabels.push_back(chan);
 
   IntLabel *rssi = new IntLabel(WiFi.RSSI(wifiIdx));
+  rssi->setPadding(0, 0, 4, 0);
   rssiLabels.push_back(rssi);
 
   Cols *wifiRow = new Cols(3);
   wifiRow->setColumn(0, ssid, SSID_WIDTH);
   wifiRow->setColumn(1, chan, CHAN_WIDTH);
   wifiRow->setColumn(2, rssi, RSSI_WIDTH);
+  if (wifiIdx % 2 == 1) {
+    // Every other row should have a non-black bg to zebra-stripe the table.
+    wifiRow->setBackground(TFT_NAVY);
+  }
   wifiRows.push_back(wifiRow);
 
   wifiListScroll.add(wifiRow);

@@ -25,16 +25,18 @@ public:
   void clear() { _entries.clear(); cascadeBoundingBox(); }; // Remove all widgets from the list.
 
   // Return number of entries in the list.
-  unsigned int getCount() const { return _entries.size(); };
+  unsigned int count() const { return _entries.size(); };
+  unsigned int position() const { return _topIdx; }; // idx of the elem @ the top of the viewport
+  unsigned int bottomIdx() const { return _lastIdx; }; // idx of the elem @ the bottom of the viewport.
 
   virtual void render(TFT_eSPI &lcd);
   virtual void cascadeBoundingBox();
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
 
-  void scrollUp(); // scroll 1 element higher.
-  void scrollTo(unsigned int idx); // specify the idx of the elem to show @ the top of the scroll box.
-  void scrollDown(); // scroll 1 element lower.
+  bool scrollUp(); // scroll 1 element higher.
+  bool scrollTo(unsigned int idx); // specify the idx of the elem to show @ the top of the scroll box.
+  bool scrollDown(); // scroll 1 element lower.
 
   // Specify height available to each entry to render within.
   void setItemHeight(int16_t newItemHeight);

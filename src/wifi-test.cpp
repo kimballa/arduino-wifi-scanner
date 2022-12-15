@@ -13,25 +13,37 @@
 //#define DBG_START_PAUSED
 #include<dbg.h>
 
+static void scanWifi();
+
 TFT_eSPI tft;
+
+constexpr int16_t SSID_WIDTH = 120;
+constexpr int16_t RSSI_WIDTH = 40;
+constexpr int16_t CHAN_WIDTH = 40;
 
 Screen screen(tft);
 // The screen is a set of rows: row of buttons, then the main vscroll.
-Rows rowLayout(2); // 2 rows.
+Rows rowLayout(3); // 3 rows.
 // the top row is a set of buttons.
 Cols topRow(4); // 4 columns
 const char *detailsStr = "Details";
 const char *rescanStr = "Refresh";
 const char *fooStr = "Foo!";
-Button detailsButton(detailsStr);
-Button rescanButton(rescanStr);
-Button fooButton(fooStr);
+UIButton detailsButton(detailsStr);
+UIButton rescanButton(rescanStr);
+UIButton fooButton(fooStr);
 // The main focus of the screen is a scrollable list of wifi SSIDs.
 VScroll wifiListScroll;
+Panel wifiScrollContainer; // Wrap VScroll in a container for padding.
 
+const char *hdrSsidStr = "SSID";
+const char *hdrRssiStr = "RSSI";
+const char *hdrChannelStr = "Chan";
 
-const char *testStr = "Testing";
-StrLabel testLabel(testStr);
+StrLabel hdrSsid = StrLabel(hdrSsidStr);
+StrLabel hdrRssi = StrLabel(hdrRssiStr);
+StrLabel hdrChannel = StrLabel(hdrChannelStr);
+Cols dataHeaderRow(3); // 3 columns.
 
 void setup() {
   DBGSETUP();
@@ -51,7 +63,11 @@ void setup() {
 
   screen.setWidget(&rowLayout);
   rowLayout.setRow(0, &topRow, 30);
-  rowLayout.setRow(1, &wifiListScroll, EQUAL); // VScroll expands to fill available space.
+  rowLayout.setRow(1, &dataHeaderRow, 16);
+  rowLayout.setRow(2, &wifiScrollContainer, EQUAL); // VScroll expands to fill available space.
+
+  wifiScrollContainer.setChild(&wifiListScroll);
+  wifiScrollContainer.setPadding(2, 2, 1, 1); // Add 1px padding around wifi list VScroll.
 
   // topRow is a Cols that holds some buttons.
   topRow.setBorder(BORDER_BOTTOM, TFT_BLUE);
@@ -72,34 +88,71 @@ void setup() {
   fooButton.setColor(TFT_BLUE);
   fooButton.setPadding(4, 4, 0, 0);
 
+  dataHeaderRow.setColumn(0, &hdrSsid, SSID_WIDTH);
+  dataHeaderRow.setColumn(1, &hdrRssi, RSSI_WIDTH);
+  dataHeaderRow.setColumn(2, &hdrChannel, CHAN_WIDTH);
+  dataHeaderRow.setBackground(TFT_BLUE);
 
-  wifiListScroll.add(&testLabel);
+  hdrSsid.setBackground(TFT_BLUE);
+  hdrSsid.setColor(TFT_WHITE);
 
+  hdrRssi.setBackground(TFT_BLUE);
+  hdrRssi.setColor(TFT_WHITE);
+
+  hdrChannel.setBackground(TFT_BLUE);
+  hdrChannel.setColor(TFT_WHITE);
+
+  scanWifi();
   screen.render();
 }
 
-void wifiLoop() {
+vector<String> ssids;
+vector<StrLabel *> ssidLabels;
+vector<IntLabel *> rssiLabels;
+vector<IntLabel *> chanLabels;
+vector<Cols *> wifiRows; // Each row is a Cols for (ssid, rssi)
+
+static void makeWifiRow(int wifiIdx) {
+  ssids.push_back(WiFi.SSID(wifiIdx));
+  StrLabel *ssid = new StrLabel(ssids[wifiIdx].c_str());
+  ssid->setFont(2);
+  ssidLabels.push_back(ssid);
+
+  IntLabel *rssi = new IntLabel(WiFi.RSSI(wifiIdx));
+  rssiLabels.push_back(rssi);
+
+  IntLabel *chan = new IntLabel(WiFi.channel(wifiIdx));
+  chanLabels.push_back(chan);
+
+  Cols *wifiRow = new Cols(3);
+  wifiRow->setColumn(0, ssid, SSID_WIDTH);
+  wifiRow->setColumn(1, rssi, RSSI_WIDTH);
+  wifiRow->setColumn(2, chan, CHAN_WIDTH);
+  wifiRows.push_back(wifiRow);
+
+  wifiListScroll.add(wifiRow);
+}
+
+
+static void scanWifi() {
   DBGPRINT("scan start");
+  // TODO(aaron): If this has already been called, free all the existing used memory.
 
   // WiFi.scanNetworks will return the number of networks found
   int n = WiFi.scanNetworks();
+  ssids.reserve(n);
+  ssidLabels.reserve(n);
+  rssiLabels.reserve(n);
+  wifiRows.reserve(n);
+
   DBGPRINT("scan done");
   if (n == 0) {
     DBGPRINT("no networks found");
   } else {
-    DBGPRINTI("networks found:", n);
     for (int i = 0; i < n; i++) {
-      // Print SSID and RSSI for each network found
-      DBGPRINTI("#", i + 1);
-      DBGPRINT(WiFi.SSID(i));
-      DBGPRINT(WiFi.RSSI(i));
-      delay(10);
+      makeWifiRow(i);
     }
   }
-  DBGPRINT("");
-
-  // Wait a bit before scanning again
-  delay(5000);
 }
 
 

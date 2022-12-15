@@ -22,8 +22,6 @@ void VScroll::render(TFT_eSPI &lcd) {
   // X position of the left-most edge of the scrollbar.
   int16_t scrollbarX = _x + _w - VSCROLL_SCROLLBAR_W;
 
-  // TODO(aaron): Compensate for padding and/or border when drawing scrollbar.
-
   // Vertical bars for sides of scrollbar.
   lcd.drawFastVLine(scrollbarX, _y, _h, scrollbarColor);
   lcd.drawFastVLine(_x + _w - 1, _y, _h, scrollbarColor);

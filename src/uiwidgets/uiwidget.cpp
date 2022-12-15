@@ -74,6 +74,22 @@ void UIWidget::drawBackground(TFT_eSPI &lcd) {
   }
 }
 
+void UIWidget::setPadding(int16_t padL, int16_t padR, int16_t padT, int16_t padB) {
+  _paddingL = padL;
+  _paddingR = padR;
+  _paddingTop = padT;
+  _paddingBottom = padB;
+
+  cascadeBoundingBox();
+}
+
+void UIWidget::getPadding(int16_t &padL, int16_t &padR, int16_t &padT, int16_t &padB) const {
+  padL = _paddingL;
+  padR = _paddingR;
+  padT = _paddingTop;
+  padB = _paddingBottom;
+}
+
 void UIWidget::getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t &childW, int16_t &childH) {
   // The bounding box for a whole-content child is the same as that of this object,
   // unless there's a border, in which case we need to give that border some breathing room.
@@ -107,6 +123,17 @@ void UIWidget::getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t
       childW -= BORDER_ACTIVE_INNER_MARGIN;
     }
   }
+
+  // Interior padding also removes from the child area within our borders.
+  childX += _paddingL;
+  childY += _paddingTop;
+
+  childW -= _paddingL;
+  childH -= _paddingTop;
+
+  childW -= _paddingR;
+  childH -= _paddingBottom;
+
 }
 
 
@@ -189,3 +216,4 @@ int16_t Panel::getContentHeight(TFT_eSPI &lcd) const {
 
   return addBorderHeight(h);
 }
+

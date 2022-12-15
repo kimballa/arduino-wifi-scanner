@@ -26,6 +26,8 @@ Rows rows(3);
 Cols midCols(3);
 VScroll vscroll;
 
+IntLabel numLabels[20];
+
 void setup() {
   DBGSETUP();
 
@@ -60,6 +62,20 @@ void setup() {
   */
 
   label3.setBorder(BORDER_RECT);
+
+  for (int i = 0; i < 20; i++) {
+    numLabels[i].setValue(i);
+    if (i % 2 == 0) {
+      numLabels[i].setBackground(TFT_NAVY);
+    } else {
+      numLabels[i].setBackground(TFT_ORANGE);
+      numLabels[i].setColor(TFT_BLACK);
+    }
+    numLabels[i].setPadding(2,2,2,2);
+    vscroll.add(&(numLabels[i]));
+  }
+
+  vscroll.scrollTo(5);
 
   screen.render();
 }
@@ -102,4 +118,5 @@ void loop() {
   DBGPRINTI("      ", label3.getWidth());
   */
 
+  //DBGPRINTI("vscroll h", vscroll.getHeight());
 }

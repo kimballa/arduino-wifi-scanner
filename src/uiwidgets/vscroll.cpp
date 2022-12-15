@@ -1,6 +1,7 @@
 // (c) Copyright 2022 Aaron Kimball
 
 #include "uiwidgets.h"
+#include<dbg.h>
 
 void VScroll::remove(UIWidget *widget) {
   for (auto it = _entries.begin(); it != _entries.end(); it++) {
@@ -29,7 +30,7 @@ void VScroll::render(TFT_eSPI &lcd) {
     }
 
     // Adjust width to provide room for the scrollbar.
-    childW -= VSCROLL_SCROLLBAR_W - VSCROLL_SCROLLBAR_MARGIN;
+    childW -= VSCROLL_SCROLLBAR_W + VSCROLL_SCROLLBAR_MARGIN;
 
     unsigned int idx = 0;
     for (auto it = _entries.begin(); it < _entries.end() && childH > 0; idx++, it++) {
@@ -95,7 +96,7 @@ void VScroll::render(TFT_eSPI &lcd) {
 
   // Now we can iterate through all the entries and render them.
   for (unsigned int i = _topIdx; i < _lastIdx; i++) {
-    UIWidget *pEntry = _entries[_topIdx];
+    UIWidget *pEntry = _entries[i];
     if (pEntry != NULL) {
       pEntry->render(lcd);
     }
@@ -106,6 +107,10 @@ void VScroll::cascadeBoundingBox() {
   // We do not perform a static cascade of our bounding box; this must be done
   // at render time when we have access to the `lcd` object and know exactly which
   // objects must be viewed.
+
+  // This method is called when our own bounding box has changed, which makes prior
+  // internal layout assumptions dirty.
+  _isDirty = true;
 }
 
 int16_t VScroll::getContentWidth(TFT_eSPI &lcd) const {

@@ -53,7 +53,8 @@ constexpr uint16_t BG_NONE = TRANSPARENT_COLOR;
 class UIWidget {
 public:
   UIWidget(): _x(0), _y(0), _w(0), _h(0),
-      _border_flags(BORDER_NONE), _border_color(TFT_WHITE), _bg_color(BG_NONE), _focused(false) {
+      _border_flags(BORDER_NONE), _border_color(TFT_WHITE), _bg_color(BG_NONE), _focused(false),
+      _paddingL(0), _paddingR(0), _paddingTop(0), _paddingBottom(0) {
   };
 
   /** Render the widget to the screen, along with any child widgets. */
@@ -86,6 +87,9 @@ public:
   bool isFocused() const { return _focused; };
   void setFocus(bool focus) { _focused = focus; };
 
+  void setPadding(int16_t padL, int16_t padR, int16_t padT, int16_t padB);
+  void getPadding(int16_t &padL, int16_t &padR, int16_t &padT, int16_t &padB) const;
+
 protected:
   void drawBorder(TFT_eSPI &lcd);
   void drawBackground(TFT_eSPI &lcd);
@@ -105,7 +109,11 @@ protected:
   border_flags_t _border_flags;
   uint16_t _border_color;
   uint16_t _bg_color;
+
   bool _focused;
+
+  // Additional user controlled interior padding.
+  int16_t _paddingL, _paddingR, _paddingTop, _paddingBottom;
 };
 
 /**

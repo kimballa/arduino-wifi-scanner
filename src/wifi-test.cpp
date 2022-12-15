@@ -71,12 +71,16 @@ void setup() {
   DBGSETUP();
   //while (!Serial) { delay(10); }
 
+  // Register the pins for the 5-way hat button.
   buttonGpioPins.push_back(WIO_5S_UP);    // Button 0
   buttonGpioPins.push_back(WIO_5S_DOWN);  // Button 1
   buttonGpioPins.push_back(WIO_5S_LEFT);  // Button 2
   buttonGpioPins.push_back(WIO_5S_RIGHT); // Button 3
   buttonGpioPins.push_back(WIO_5S_PRESS); // Button 4
-  // TODO(aaron): Add buttons for 3 top-side buttons.
+  // Add the 3 top-side buttons.
+  buttonGpioPins.push_back(WIO_KEY_A); // Button 5
+  buttonGpioPins.push_back(WIO_KEY_B); // Button 6
+  buttonGpioPins.push_back(WIO_KEY_C); // Button 7
 
   for (auto pin: buttonGpioPins) {
     pinMode(pin, INPUT_PULLUP);
@@ -84,7 +88,7 @@ void setup() {
 
   buttons.emplace_back(0, scrollUpHandler);
   buttons.emplace_back(1, scrollDownHandler);
-  // TODO(aaron): Add Button / handlers for btns 2--4.
+  // TODO(aaron): Add Button / handlers for btns 2--7.
 
   tft.begin();
   tft.setRotation(3);
@@ -132,12 +136,15 @@ void setup() {
 
   hdrSsid.setBackground(TFT_BLUE);
   hdrSsid.setColor(TFT_WHITE);
+  hdrSsid.setPadding(2, 0, 2, 0);
 
   hdrRssi.setBackground(TFT_BLUE);
   hdrRssi.setColor(TFT_WHITE);
+  hdrRssi.setPadding(0, 0, 2, 0);
 
   hdrChannel.setBackground(TFT_BLUE);
   hdrChannel.setColor(TFT_WHITE);
+  hdrChannel.setPadding(0, 0, 2, 0);
 
   scanWifi();
   screen.render();

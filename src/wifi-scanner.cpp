@@ -1,25 +1,9 @@
 // (c) Copyright 2022 Aaron Kimball
 //
-// Test the wifi functionality.
+// Measure wifi signal usage.
 
-// C/C++ includes
-#include<cstring>
+#include "wifi-scanner.h"
 
-// Arduino
-#include<Arduino.h>
-
-// Libraries
-#include<rpcWiFi.h>
-#include<TFT_eSPI.h>
-#include<debounce.h>
-
-#define DEBUG
-#define DBG_PRETTY_FUNCTIONS
-//#define DBG_WAIT_FOR_CONNECT
-//#define DBG_START_PAUSED
-#include<dbg.h>
-
-#include "uiwidgets/uiwidgets.h"
 
 static void scanWifi();
 
@@ -71,7 +55,7 @@ static vector<uint8_t> buttonGpioPins;
 // Copies the specified text (up to 80 chars) into the status line buffer
 // and renders it to the bottom of the screen. If immediateRedraw=false,
 // the visible widget will not be updated until your next screen.render() call.
-void setStatusLine(const char *in, bool immediateRedraw=true) {
+void setStatusLine(const char *in, bool immediateRedraw) {
   if (NULL == in) {
     statusLine[0] = '\0';
     return;
@@ -212,13 +196,13 @@ void setup() {
   setStatusLine("Scan complete.");
 }
 
-static String* ssids;
-static StrLabel** ssidLabels;
-static IntLabel** chanLabels;
-static IntLabel** rssiLabels;
-static String* bssids;
-static StrLabel** bssidLabels;
-static Cols** wifiRows; // Each row is a Cols for (ssid, chan, rssi, bssid)
+static String ssids[SCAN_MAX_NUMBER];
+static StrLabel* ssidLabels[SCAN_MAX_NUMBER];
+static IntLabel* chanLabels[SCAN_MAX_NUMBER];
+static IntLabel* rssiLabels[SCAN_MAX_NUMBER];
+static String bssids[SCAN_MAX_NUMBER];
+static StrLabel* bssidLabels[SCAN_MAX_NUMBER];
+static Cols* wifiRows[SCAN_MAX_NUMBER]; // Each row is a Cols for (ssid, chan, rssi, bssid)
 
 static void makeWifiRow(int wifiIdx) {
   ssids[wifiIdx] = String(WiFi.SSID(wifiIdx));
@@ -258,17 +242,26 @@ static void makeWifiRow(int wifiIdx) {
 
 static void scanWifi() {
   DBGPRINT("scan start");
-  // TODO(aaron): If this has already been called, free all the existing used memory.
+
+  // TODO(aaron): If this has already been called, free all the existing used memory,
+  // by deleting all the pointed-to things from the ptrs in the various arrays.
+
+  // Initialize all our arrays to have no data / NULL ptrs.
+  for (int i = 0; i < SCAN_MAX_NUMBER; i++) {
+    ssids[i] = String();
+    bssids[i] = String();
+  }
+
+  memset(ssidLabels, 0, sizeof(StrLabel*) * SCAN_MAX_NUMBER);
+  memset(chanLabels, 0, sizeof(IntLabel*) * SCAN_MAX_NUMBER);
+  memset(rssiLabels, 0, sizeof(IntLabel*) * SCAN_MAX_NUMBER);
+  memset(bssidLabels, 0, sizeof(StrLabel*) * SCAN_MAX_NUMBER);
+  memset(wifiRows, 0, sizeof(Cols*) * SCAN_MAX_NUMBER);
+
+  wifiListScroll.clear(); // Wipe scrollbox contents.
 
   // WiFi.scanNetworks will return the number of networks found
   int n = WiFi.scanNetworks();
-  ssids = new String[n];
-  ssidLabels = new StrLabel*[n];
-  chanLabels = new IntLabel*[n];
-  rssiLabels = new IntLabel*[n];
-  bssids = new String[n];
-  bssidLabels = new StrLabel*[n];
-  wifiRows = new Cols*[n];
 
   DBGPRINT("scan done");
   if (n == 0) {

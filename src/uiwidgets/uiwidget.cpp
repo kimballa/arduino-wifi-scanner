@@ -111,6 +111,8 @@ bool UIWidget::containsWidget(UIWidget *widget) const {
    * Therefore, the top-left corner is inside this widget's BB iff the whole widget is inside this
    * one. Hanging onto these additional checks for now, just in case though...
    * TODO(aaron): Remove once we're confident they're not needed.
+   * (Note that non-visible VScroll elements still "belong to" the VScroll but
+   * myVScroll.contains(anOffscreenElem) will return false.)
   else if (w->_x + w->_w - 1 >= _x && w->_x + w->_w - 1 < _x + _w && w->_y >= _y && w->_y < _y + _h) {
     return true; // top-right corner
   } else if (w->_x >= _x && w->_x < _x + _w && w->_y + w->_h - 1 >= _y && w->_y + w->_h - 1< _y + _h) {

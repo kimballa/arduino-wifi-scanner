@@ -12,23 +12,29 @@
   ... alt, make each histogram column a bunch of square blocks, one block per count, and have
   them be a heatmap indicating RSSI. (Stronger signals bright red, weaker signals fade to black.)
 
-  * 802.11a/g (2.4 GHz) spectral fall-off: 
+  * 802.11a/g (2.4 GHz) spectral fall-off:
     chan dist     freq dist    power
     1             +/- 5 MHz        0
     2             +/-10 MHz      -15 dBm (x1/32 Watts pwr)
     3             +/-15 MHz      -25 dBm (x1/128 W pwr)
-    4             +/-20 Mhz      -28 dBm (x1/256 W pwr) (Considered non-interfering) 
+    4             +/-20 Mhz      -28 dBm (x1/256 W pwr) (Considered non-interfering)
   * 802.11b (2.4 GHz) spectral fall-off:
     chan dist     freq dist    power
     1             +/- 5 MHz        0
-    2             +/-10 MHz        0 dBm 
+    2             +/-10 MHz        0 dBm
     3             +/-15 MHz      -30 dBm (x1/512 W pwr)
-    4             +/-20 Mhz      -50 dBm (Non-interfering) 
+    4             +/-20 Mhz      -50 dBm (Non-interfering)
 
 * Main UI
   * (ok) List all wifi channels in a scrollable thingie
   * (ok) Scroll thru the wifi channels
   * Select a wifi channel > See a detail page.
+
+* Use WiFi.getScanInfoByIndex() to get the wifi_ap_record_t (rpcUnified: esp_wifi_types.h) for a channel,
+  - use phy_11b, _11g, _11n flags for detail page on wifi signal
+  - Use `wifi_second_chan_t second` to determine if it's a 20 MHz or 40 MHz channel, and if so
+    whether it's the channel above or below (for heatmap purposes).
+  - Use `bssid` and `ssid` fields directly rather than copying all those strings.
 
 
 * Pull out UIWidgets into a separate library.

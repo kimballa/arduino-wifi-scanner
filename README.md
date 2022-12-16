@@ -10,7 +10,12 @@ Dependencies
 ------------
 
 This depends on the `Seeed_Arduino_rpcWifi` library and its extensive
-net of transitive dependencies.
+net of transitive dependencies for WiFi, and `Seeed_Arduino_LCD` for LCD
+screen usage.
+
+Also uses my [debounce library](https://github.com/kimballa/button-debounce) for buttons
+and [PyArduinoDebug](https://github.com/kimballa/PyArduinoDebug) for debugger/logging
+support.
 
 Compiling
 ---------

@@ -28,11 +28,29 @@
   invalidate the narrower rect that contains the VScroll elements, not the scrollbar too.
   And the VScroll's own redrawChildWidget() would need to take different logic than just
   blindly invoking its own render().
+
+
+  ... redrawChildWidget() should take an optional param that sends a hint to the widget
+  being redrawn. Then we can do screen.redrawWidget(vscroll, SCROLL_DATA_AREA),
+  screen.redrawWidget(vscroll, SCROLLBAR), etc.
+
+  If the redraw args are non-zero, no parent backgrounds are drawn at all.
+
+  - Every row of the zebra-stripe table needs its own explicit bg color
+  - No top-screen BG color
+  - VScroll needs a separate scrollbar_area_bg to redraw that area.
+
 * Improvement: scrollUp() and scrollDown() should momentarily make the appropriate caret
   turn solid; they should also (be able to) manage the re-rendering.
   * alt: add methods to highlight the carets, and have the "click down" event in the button handler
     highlight the caret (and unhighlight it on release -- automatic given entire VScroll is
     currently redrawn).
+
+
+* Add a BarChart widget that lets us show the histogram of signals on each freq, separate charts
+  for 2.4G and 5Ghz.
+  ... alt, make each histogram column a bunch of square blocks, one block per count, and have
+  them be a heatmap indicating RSSI. (Stronger signals bright red, weaker signals fade to black.)
 
 * Main UI
   * (ok) List all wifi channels in a scrollable thingie

@@ -25,9 +25,10 @@ static void scanWifi();
 
 TFT_eSPI tft;
 
-static constexpr int16_t SSID_WIDTH = 120;
-static constexpr int16_t CHAN_WIDTH = 40;
-static constexpr int16_t RSSI_WIDTH = 40;
+static constexpr int16_t SSID_WIDTH = 140;
+static constexpr int16_t CHAN_WIDTH = 30;
+static constexpr int16_t RSSI_WIDTH = 30;
+static constexpr int16_t BSSID_WIDTH = 80;
 
 Screen screen(tft);
 // The screen is a set of rows: row of buttons, then the main vscroll.
@@ -45,11 +46,13 @@ static UIButton fooButton(fooStr);
 static const char *hdrSsidStr = "SSID";
 static const char *hdrChannelStr = "Chan";
 static const char *hdrRssiStr = "RSSI";
+static const char *hdrBssidStr = "BSSID";
 
 static StrLabel hdrSsid = StrLabel(hdrSsidStr);
 static StrLabel hdrChannel = StrLabel(hdrChannelStr);
 static StrLabel hdrRssi = StrLabel(hdrRssiStr);
-static Cols dataHeaderRow(3); // 3 columns.
+static StrLabel hdrBssid = StrLabel(hdrBssidStr);
+static Cols dataHeaderRow(4); // 4 columns.
 
 // Row 2: The main focus of the screen is a scrollable list of wifi SSIDs.
 static VScroll wifiListScroll;
@@ -165,6 +168,7 @@ void setup() {
   dataHeaderRow.setColumn(0, &hdrSsid, SSID_WIDTH);
   dataHeaderRow.setColumn(1, &hdrChannel, CHAN_WIDTH);
   dataHeaderRow.setColumn(2, &hdrRssi, RSSI_WIDTH);
+  dataHeaderRow.setColumn(3, &hdrBssid, BSSID_WIDTH);
   dataHeaderRow.setBackground(TFT_BLUE);
 
   hdrSsid.setBackground(TFT_BLUE);
@@ -179,6 +183,10 @@ void setup() {
   hdrChannel.setColor(TFT_WHITE);
   hdrChannel.setPadding(0, 0, 2, 0);
 
+  hdrBssid.setBackground(TFT_BLUE);
+  hdrBssid.setColor(TFT_WHITE);
+  hdrBssid.setPadding(0, 0, 2, 0);
+
   statusLineLabel.setBackground(TFT_BLUE);
   statusLineLabel.setPadding(2, 0, 2, 0);
 
@@ -188,36 +196,44 @@ void setup() {
   setStatusLine("Scan complete.");
 }
 
-static vector<String> ssids;
-static vector<StrLabel *> ssidLabels;
-static vector<IntLabel *> chanLabels;
-static vector<IntLabel *> rssiLabels;
-static vector<Cols *> wifiRows; // Each row is a Cols for (ssid, rssi)
+static String* ssids;
+static StrLabel** ssidLabels;
+static IntLabel** chanLabels;
+static IntLabel** rssiLabels;
+static String* bssids;
+static StrLabel** bssidLabels;
+static Cols** wifiRows; // Each row is a Cols for (ssid, chan, rssi, bssid)
 
 static void makeWifiRow(int wifiIdx) {
-  ssids.push_back(WiFi.SSID(wifiIdx));
+  ssids[wifiIdx] = String(WiFi.SSID(wifiIdx));
   StrLabel *ssid = new StrLabel(ssids[wifiIdx].c_str());
   ssid->setFont(2); // Use larger 16px font for SSID.
-  ssidLabels.push_back(ssid);
+  ssidLabels[wifiIdx] = ssid;
 
   IntLabel *chan = new IntLabel(WiFi.channel(wifiIdx));
   chan->setPadding(0, 0, 4, 0); // Push default small font to middle of row height.
-  chanLabels.push_back(chan);
+  chanLabels[wifiIdx] = chan;
 
   IntLabel *rssi = new IntLabel(WiFi.RSSI(wifiIdx));
   rssi->setPadding(0, 0, 4, 0);
-  rssiLabels.push_back(rssi);
+  rssiLabels[wifiIdx] = rssi;
 
-  Cols *wifiRow = new Cols(3);
+  bssids[wifiIdx] = String(WiFi.BSSIDstr(wifiIdx));
+  StrLabel *bssid = new StrLabel(bssids[wifiIdx].c_str());
+  bssid->setPadding(0, 0, 4, 0);
+  bssidLabels[wifiIdx] = bssid;
+
+  Cols *wifiRow = new Cols(4);
   wifiRow->setColumn(0, ssid, SSID_WIDTH);
   wifiRow->setColumn(1, chan, CHAN_WIDTH);
   wifiRow->setColumn(2, rssi, RSSI_WIDTH);
+  wifiRow->setColumn(3, bssid, BSSID_WIDTH);
   if (wifiIdx % 2 == 1) {
     // Every other row should have a non-black bg to zebra-stripe the table.
     wifiRow->setBackground(TFT_NAVY);
   }
-  wifiRows.push_back(wifiRow);
 
+  wifiRows[wifiIdx] = wifiRow;
   wifiListScroll.add(wifiRow);
 }
 
@@ -228,10 +244,13 @@ static void scanWifi() {
 
   // WiFi.scanNetworks will return the number of networks found
   int n = WiFi.scanNetworks();
-  ssids.reserve(n);
-  ssidLabels.reserve(n);
-  rssiLabels.reserve(n);
-  wifiRows.reserve(n);
+  ssids = new String[n];
+  ssidLabels = new StrLabel*[n];
+  chanLabels = new IntLabel*[n];
+  rssiLabels = new IntLabel*[n];
+  bssids = new String[n];
+  bssidLabels = new StrLabel*[n];
+  wifiRows = new Cols*[n];
 
   DBGPRINT("scan done");
   if (n == 0) {

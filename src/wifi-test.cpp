@@ -89,7 +89,7 @@ static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
   if (btnState == BTN_PRESSED) { return; };
 
   if (wifiListScroll.scrollUp()) {
-    screen.renderWidget(&wifiListScroll);
+    screen.renderWidget(&wifiListScroll, RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT);
   }
 }
 
@@ -98,7 +98,7 @@ static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
   if (btnState == BTN_PRESSED) { return; };
 
   if (wifiListScroll.scrollDown()) {
-    screen.renderWidget(&wifiListScroll);
+    screen.renderWidget(&wifiListScroll, RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT);
   }
 }
 
@@ -137,6 +137,7 @@ void setup() {
   WiFi.disconnect();
   delay(100);
 
+  screen.setBackground(TRANSPARENT_COLOR);
   screen.setWidget(&rowLayout);
   rowLayout.setRow(0, &topRow, 30);
   rowLayout.setRow(1, &dataHeaderRow, 16);
@@ -190,7 +191,8 @@ void setup() {
   statusLineLabel.setBackground(TFT_BLUE);
   statusLineLabel.setPadding(2, 0, 2, 0);
 
-  scanWifi();
+  scanWifi(); // Populates VScroll elements.
+  tft.fillScreen(TFT_BLACK); // Clear 'loading' screen msg.
   screen.render();
 
   setStatusLine("Scan complete.");
@@ -231,6 +233,8 @@ static void makeWifiRow(int wifiIdx) {
   if (wifiIdx % 2 == 1) {
     // Every other row should have a non-black bg to zebra-stripe the table.
     wifiRow->setBackground(TFT_NAVY);
+  } else {
+    wifiRow->setBackground(TFT_BLACK);
   }
 
   wifiRows[wifiIdx] = wifiRow;

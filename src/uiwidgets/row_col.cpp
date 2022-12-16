@@ -167,7 +167,7 @@ int16_t Rows::getContentHeight(TFT_eSPI &lcd) const {
   return addBorderHeight(h);
 }
 
-bool Rows::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
+bool Rows::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags) {
   if (NULL == widget) {
     return false;
   } else if (this == widget) {
@@ -177,8 +177,8 @@ bool Rows::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
     for (unsigned int i = 0; i < _numRows; i++) {
       if (_elements[i] != NULL && _elements[i]->containsWidget(widget)) {
         // Found the row containing the widget.
-        drawBackgroundUnderWidget(widget, lcd);
-        return _elements[i]->redrawChildWidget(widget, lcd);
+        drawBackgroundUnderWidget(widget, lcd, renderFlags);
+        return _elements[i]->redrawChildWidget(widget, lcd, renderFlags);
       }
     }
   }
@@ -354,7 +354,7 @@ int16_t Cols::getContentWidth(TFT_eSPI &lcd) const {
   return addBorderWidth(w);
 }
 
-bool Cols::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
+bool Cols::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags) {
   if (NULL == widget) {
     return false;
   } else if (this == widget) {
@@ -364,8 +364,8 @@ bool Cols::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
     for (unsigned int i = 0; i < _numCols; i++) {
       if (_elements[i] != NULL && _elements[i]->containsWidget(widget)) {
         // Found the column containing the widget.
-        drawBackgroundUnderWidget(widget, lcd);
-        return _elements[i]->redrawChildWidget(widget, lcd);
+        drawBackgroundUnderWidget(widget, lcd, renderFlags);
+        return _elements[i]->redrawChildWidget(widget, lcd, renderFlags);
       }
     }
   }

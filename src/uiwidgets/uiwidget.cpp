@@ -26,6 +26,13 @@ void UIWidget::setBackground(uint16_t color) {
   _bg_color = color;
 }
 
+void UIWidget::getRect(int16_t &cx, int16_t &cy, int16_t &cw, int16_t &ch) const {
+  cx = _x;
+  cy = _y;
+  cw = _w;
+  ch = _h;
+}
+
 void UIWidget::drawBorder(TFT_eSPI &lcd) {
   // TODO: Implement flex-height / flex-width border.
 
@@ -117,7 +124,7 @@ bool UIWidget::containsWidget(UIWidget *widget) const {
   return false;
 }
 
-bool UIWidget::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
+bool UIWidget::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags) {
   // Default implementation for widgets that do not contain nested/child widgets.
   if (NULL == widget) {
     return false;
@@ -217,13 +224,17 @@ int16_t UIWidget::addBorderHeight(int16_t contentHeight) const {
 /**
  * Fill in the background that this widget would render underneath another widget being redrawn.
  */
-void UIWidget::drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd) {
+void UIWidget::drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags) {
   if (NULL == widget) {
     return;
   }
 
   if (_bg_color == TRANSPARENT_COLOR) {
     return; // Nothing to draw.
+  }
+
+  if ((renderFlags & RF_NO_BACKGROUNDS) == 0) {
+    return; // Don't draw backgrounds in this refresh process.
   }
 
   uint16_t bg = _focused ? invertColor(_bg_color) : _bg_color;
@@ -271,14 +282,14 @@ int16_t Panel::getContentHeight(TFT_eSPI &lcd) const {
   return addBorderHeight(h);
 }
 
-bool Panel::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd) {
+bool Panel::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags) {
   if (NULL == widget) {
     return false;
   } else if (widget == this) {
     render(lcd);
     return true;
   } else if (containsWidget(widget) && NULL != _child) {
-    drawBackgroundUnderWidget(widget, lcd);
+    drawBackgroundUnderWidget(widget, lcd, renderFlags);
     return _child->redrawChildWidget(widget, lcd);
   }
 

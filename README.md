@@ -1,24 +1,34 @@
 
-wifi-test
-==========
+Wifi scanner
+============
 
-An Arduino sketch that tests the Seeed Wio Terminal's wifi capabilities.
+An Arduino sketch that uses the Seeed Wio Terminal's wifi capabilities to map out
+channel congestion in 2.4 GHz (802.11b/g/n) and 5 GHz (802.11a/n/ac) frequency bands.
 
-This is explicitly designed to operate on the `Seeeduino:samd:wio_terminal` board.
+This is explicitly designed to operate on the `Seeeduino:samd:wio_terminal` board,
+with its companion RTL8721D dual-band wifi SoC.
 
 Dependencies
 ------------
 
-This depends on the `Seeed_Arduino_rpcWifi` library and its extensive
-net of transitive dependencies for WiFi, and `Seeed_Arduino_LCD` for LCD
-screen usage.
+This depends on the [Seeed\_Arduino\_rpcWiFi](https://github.com/Seeed-Studio/Seeed_Arduino_rpcWiFi)
+library (and its extensive net of transitive dependencies for WiFi), and
+[Seeed\_Arduino\_LCD](https://github.com/Seeed-Studio/Seeed_Arduino_LCD)
+for LCD screen usage.
 
 Also uses my [debounce library](https://github.com/kimballa/button-debounce) for buttons
 and [PyArduinoDebug](https://github.com/kimballa/PyArduinoDebug) for debugger/logging
 support.
 
+See the full `libs` list in the
+[Makefile](https://github.com/kimballa/arduino-wifi-scanner/blob/main/Makefile) for all
+direct and transitive library dependencies.
+
 Compiling
 ---------
+
+If you add the requisite libraries to a sketch based on this source, you should be able to
+compile and deploy with the Arduino IDE.
 
 I build this with my [Arduino makefile](https://github.com/kimballa/arduino-makefile).
 
@@ -26,9 +36,9 @@ I build this with my [Arduino makefile](https://github.com/kimballa/arduino-make
 * Create `~/arduino_mk.conf` from the template in that directory and customize it to your board
   and local environment. See other one-time setup instructions in that project's README.md and/or
   the comment header of `arduino.mk`.
-* Clone the `libardinodbg` library project as a sibling as well.
+* Clone `PyArduinoDebug`, `button-debounce`, and other necessary library projects as siblings as well.
 * In the library directory, build with `make install`.
-* Build this with `make image` or build and upload with `make verify`.
+* After building all the libraries, build this with `make image` or build and upload with `make verify`.
 
 License
 -------

@@ -1,19 +1,5 @@
 
 * Make UI widget library
-  * (ok) Panel (nestable/composable; no visible chrome by default; holds another elt)
-    * (ok) Columns
-  * (ok) VScroll Widget
-    * (ok) Entry element
-    * (ok) Scrollbar
-  * (ok) Button
-  * (ok) Text line
-    * (ok) Str text line
-    * (ok) Int text line
-    * (ok) Float text line
-  * (ok) All items can have border (square or rounded; viz on each side independently or full-around.)
-  * (ok) All items can be shown inverted for focus
-  * (ok) Add invalidateElem(UIWidget*) method to redraw only the components of the screen that
-    get composited into the rect for that widget.
   * clearAllFocus() should hierarchically reset all focus to false.
   * need to have 'tab order' to walk through things the user can select?
   * Do we need actions like Button::onClick() ? Or should that just get managed manually?
@@ -21,24 +7,6 @@
   * Checkbox ?
   * Radio button ?
 
-
-* Improvement: VScroll re-render should not clear/redraw the whole scroll-bar;
-  it should just "un-draw" the current slider box and then add the new square.
-  ... this would require a big refactor: the parent widgets would need to know to
-  invalidate the narrower rect that contains the VScroll elements, not the scrollbar too.
-  And the VScroll's own redrawChildWidget() would need to take different logic than just
-  blindly invoking its own render().
-
-
-  ... redrawChildWidget() should take an optional param that sends a hint to the widget
-  being redrawn. Then we can do screen.redrawWidget(vscroll, SCROLL_DATA_AREA),
-  screen.redrawWidget(vscroll, SCROLLBAR), etc.
-
-  If the redraw args are non-zero, no parent backgrounds are drawn at all.
-
-  - Every row of the zebra-stripe table needs its own explicit bg color
-  - No top-screen BG color
-  - VScroll needs a separate scrollbar_area_bg to redraw that area.
 
 * Improvement: scrollUp() and scrollDown() should momentarily make the appropriate caret
   turn solid; they should also (be able to) manage the re-rendering.
@@ -57,3 +25,5 @@
   * (ok) Scroll thru the wifi channels
   * Select a wifi channel > See a detail page.
 
+
+* Pull out UIWidgets into a separate library.

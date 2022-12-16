@@ -26,7 +26,7 @@ public:
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
 
-  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd);
+  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags=0);
 
 private:
   uint16_t _numRows;
@@ -55,7 +55,7 @@ public:
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
 
-  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd);
+  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags=0);
 
 private:
   uint16_t _numCols;

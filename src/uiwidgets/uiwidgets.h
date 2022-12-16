@@ -80,6 +80,9 @@ public:
   int16_t getWidth() const { return _w; }; // Return width of widget apportioned for rendering.
   int16_t getHeight() const { return _h; }; // Return height of widget apportioned for rendering.
 
+  // Return the entire rect of getX(), getY(), getWidth() and getHeight().
+  void getRect(int16_t &cx, int16_t &cy, int16_t &cw, int16_t &ch) const;
+
   // Return width required for widget to render all content without overflow.
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const = 0;
   // Return height required for widget to render all content without overflow.
@@ -95,12 +98,12 @@ public:
   bool containsWidget(UIWidget *widget) const;
   // Redraw only the part of the screen contained by widget 'widget'.
   // Returns true if we handled the redraw.
-  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd);
+  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags=0);
 
 protected:
   void drawBorder(TFT_eSPI &lcd);
   void drawBackground(TFT_eSPI &lcd);
-  void drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd);
+  void drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags=0);
 
   /** Get area bounding box available for rendering within the context of any border or other
    * padding that belongs to this widget.
@@ -141,7 +144,7 @@ public:
   virtual void cascadeBoundingBox();
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
-  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd);
+  virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags=0);
 
 private:
   UIWidget *_child;

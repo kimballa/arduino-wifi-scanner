@@ -23,14 +23,14 @@
 
 static void scanWifi();
 
-TFT_eSPI tft;
+TFT_eSPI lcd;
 
 static constexpr int16_t SSID_WIDTH = 140;
 static constexpr int16_t CHAN_WIDTH = 30;
 static constexpr int16_t RSSI_WIDTH = 30;
 static constexpr int16_t BSSID_WIDTH = 80;
 
-Screen screen(tft);
+Screen screen(lcd);
 // The screen is a set of rows: row of buttons, then the main vscroll.
 static Rows rowLayout(4); // 3 rows.
 // the top row (#0) is a set of buttons.
@@ -86,19 +86,33 @@ void setStatusLine(const char *in, bool immediateRedraw=true) {
 
 // 5-way hat "up" -- scroll up the list.
 static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
-  if (btnState == BTN_PRESSED) { return; };
+  if (btnState == BTN_PRESSED) {
+    wifiListScroll.renderScrollUp(lcd, true);
+    return;
+  }
 
+  // Button released; perform action.
   if (wifiListScroll.scrollUp()) {
     screen.renderWidget(&wifiListScroll, RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT);
+  } else {
+    // Cannot scroll further up. Only redraw the up-caret to finish the animation.
+    wifiListScroll.renderScrollUp(lcd, false);
   }
 }
 
 // 5-way hat "down" -- scroll down the list.
 static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
-  if (btnState == BTN_PRESSED) { return; };
+  if (btnState == BTN_PRESSED) {
+    wifiListScroll.renderScrollDown(lcd, true);
+    return;
+  }
 
+  // Button released; perform action.
   if (wifiListScroll.scrollDown()) {
     screen.renderWidget(&wifiListScroll, RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT);
+  } else {
+    // Cannot scroll further down. Only redraw the down-caret to finish the animation.
+    wifiListScroll.renderScrollDown(lcd, false);
   }
 }
 
@@ -125,12 +139,12 @@ void setup() {
   buttons.emplace_back(1, scrollDownHandler);
   // TODO(aaron): Add Button / handlers for btns 2--7.
 
-  tft.begin();
-  tft.setRotation(3);
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextFont(2); // 0 for 8px, 2 for 16px.
-  tft.setTextColor(TFT_WHITE);
-  tft.drawString("Wifi analyzer starting up...", 0, 0);
+  lcd.begin();
+  lcd.setRotation(3);
+  lcd.fillScreen(TFT_BLACK);
+  lcd.setTextFont(2); // 0 for 8px, 2 for 16px.
+  lcd.setTextColor(TFT_WHITE);
+  lcd.drawString("Wifi analyzer starting up...", 0, 0);
 
   // Set WiFi to station mode and disconnect from an AP if it was previously connected
   WiFi.mode(WIFI_STA);
@@ -192,7 +206,7 @@ void setup() {
   statusLineLabel.setPadding(2, 0, 2, 0);
 
   scanWifi(); // Populates VScroll elements.
-  tft.fillScreen(TFT_BLACK); // Clear 'loading' screen msg.
+  lcd.fillScreen(TFT_BLACK); // Clear 'loading' screen msg.
   screen.render();
 
   setStatusLine("Scan complete.");

@@ -41,6 +41,8 @@ public:
 
   virtual void render(TFT_eSPI &lcd) { render(lcd, RF_NONE); };
   void render(TFT_eSPI &lcd, uint32_t renderFlags);
+  void renderScrollUp(TFT_eSPI &lcd, bool btnActive);
+  void renderScrollDown(TFT_eSPI &lcd, bool btnActive);
   virtual void cascadeBoundingBox();
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;

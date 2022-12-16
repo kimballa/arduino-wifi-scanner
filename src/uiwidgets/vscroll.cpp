@@ -2,6 +2,9 @@
 
 #include "uiwidgets.h"
 
+// The button boxes at top and bottom of the scrollbar are 12 px tall.
+static constexpr int16_t scrollBoxWidgetHeight = 12;
+
 void VScroll::remove(UIWidget *widget) {
   for (auto it = _entries.begin(); it != _entries.end(); it++) {
     if (*it == widget) {
@@ -31,9 +34,13 @@ void VScroll::renderScrollbar(TFT_eSPI &lcd) {
   if (_scrollbar_bg_color != TRANSPARENT_COLOR) {
     // Fill in the background of the scrollbar area.
     // Since the left & right edges will be taken up completely with the vertical borders of
-    // the scrollbar, do not include them in the fill.
+    // the scrollbar, do not include them in the fill. The areas near the top and bottom
+    // containing the carets will also be filled in renderScrollUp()/renderScrollDown(), so
+    // we only need to focus on the main scroll indicator.
     uint16_t scrollbarBg = _focused ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
-    lcd.fillRect(scrollbarX + 1, _y, VSCROLL_SCROLLBAR_W - 2, _h, scrollbarBg);
+    lcd.fillRect(scrollbarX + 1, _y + scrollBoxWidgetHeight + 1,
+        VSCROLL_SCROLLBAR_W - 2, _h - 2 * scrollBoxWidgetHeight - 1,
+        scrollbarBg);
   }
 
   drawBorder(lcd);
@@ -44,7 +51,6 @@ void VScroll::renderScrollbar(TFT_eSPI &lcd) {
   lcd.drawFastVLine(scrollbarX, _y, _h, scrollbarColor);
   lcd.drawFastVLine(_x + _w - 1, _y, _h, scrollbarColor);
   // 4 horizontal bars at top and bottom for outline of the ^ and v boxes
-  constexpr int16_t scrollBoxWidgetHeight = 12; // Those boxes are 12 px tall.
   lcd.drawFastHLine(scrollbarX, _y, VSCROLL_SCROLLBAR_W, scrollbarColor);
   lcd.drawFastHLine(scrollbarX, _y + scrollBoxWidgetHeight, VSCROLL_SCROLLBAR_W, scrollbarColor);
   lcd.drawFastHLine(scrollbarX, _y + _h - 1 - scrollBoxWidgetHeight, VSCROLL_SCROLLBAR_W, scrollbarColor);
@@ -52,17 +58,8 @@ void VScroll::renderScrollbar(TFT_eSPI &lcd) {
 
   // Draw carets
 
-  // Upward facing ^ for scroll-up, at the top.
-  lcd.drawTriangle(scrollbarX + 2, _y + scrollBoxWidgetHeight - 2,
-                   _x + _w - 3,    _y + scrollBoxWidgetHeight - 2,
-                   scrollbarX + (VSCROLL_SCROLLBAR_W / 2), _y + 2,
-                   scrollbarColor);
-
-  // Downward facing v for scroll-down, at the bottom.
-  lcd.drawTriangle(scrollbarX + 2, _y + _h - scrollBoxWidgetHeight + 2,
-                   _x + _w - 3,    _y + _h - scrollBoxWidgetHeight + 2,
-                   scrollbarX + (VSCROLL_SCROLLBAR_W / 2), _y + _h - 3,
-                   scrollbarColor);
+  renderScrollUp(lcd, false);
+  renderScrollDown(lcd, false);
 
   // Draw the scroll position indicator.
   // Use MacOS-style fixed-size box whose position is proportional to the position of the viewing
@@ -83,6 +80,64 @@ void VScroll::renderContentArea(TFT_eSPI &lcd) {
     }
   }
 }
+
+void VScroll::renderScrollUp(TFT_eSPI &lcd, bool btnActive) {
+  // X position of the left-most edge of the scrollbar.
+  int16_t scrollbarX = _x + _w - VSCROLL_SCROLLBAR_W;
+
+  if (_scrollbar_bg_color != TRANSPARENT_COLOR) {
+    // Fill in the background of the scrollbar area under the caret.
+    // Since the edges will be taken up completely with the horiz and vertical borders of
+    // the scrollbar, do not include them in the fill.
+    uint16_t scrollbarBg = _focused ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
+    lcd.fillRect(scrollbarX + 1, _y + 1, VSCROLL_SCROLLBAR_W - 2, scrollBoxWidgetHeight - 1,
+        scrollbarBg);
+  }
+
+  uint16_t scrollbarColor = _focused ? invertColor(_border_color) : _border_color;
+
+  // Upward facing ^ for scroll-up, at the top.
+  if (btnActive) {
+    lcd.fillTriangle(scrollbarX + 2, _y + scrollBoxWidgetHeight - 2,
+                     _x + _w - 3,    _y + scrollBoxWidgetHeight - 2,
+                     scrollbarX + (VSCROLL_SCROLLBAR_W / 2), _y + 2,
+                     scrollbarColor);
+  } else {
+    lcd.drawTriangle(scrollbarX + 2, _y + scrollBoxWidgetHeight - 2,
+                     _x + _w - 3,    _y + scrollBoxWidgetHeight - 2,
+                     scrollbarX + (VSCROLL_SCROLLBAR_W / 2), _y + 2,
+                     scrollbarColor);
+  }
+}
+void VScroll::renderScrollDown(TFT_eSPI &lcd, bool btnActive) {
+  // X position of the left-most edge of the scrollbar.
+  int16_t scrollbarX = _x + _w - VSCROLL_SCROLLBAR_W;
+
+  if (_scrollbar_bg_color != TRANSPARENT_COLOR) {
+    // Fill in the background of the scrollbar area under the caret.
+    // Since the edges will be taken up completely with the horiz and vertical borders of
+    // the scrollbar, do not include them in the fill.
+    uint16_t scrollbarBg = _focused ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
+    lcd.fillRect(scrollbarX + 1, _y + _h - scrollBoxWidgetHeight, VSCROLL_SCROLLBAR_W - 2,
+        scrollBoxWidgetHeight - 1, scrollbarBg);
+  }
+
+  uint16_t scrollbarColor = _focused ? invertColor(_border_color) : _border_color;
+
+  // Downward facing v for scroll-down, at the bottom.
+  if (btnActive) {
+    lcd.fillTriangle(scrollbarX + 2, _y + _h - scrollBoxWidgetHeight + 2,
+                     _x + _w - 3,    _y + _h - scrollBoxWidgetHeight + 2,
+                     scrollbarX + (VSCROLL_SCROLLBAR_W / 2), _y + _h - 3,
+                     scrollbarColor);
+  } else {
+    lcd.drawTriangle(scrollbarX + 2, _y + _h - scrollBoxWidgetHeight + 2,
+                     _x + _w - 3,    _y + _h - scrollBoxWidgetHeight + 2,
+                     scrollbarX + (VSCROLL_SCROLLBAR_W / 2), _y + _h - 3,
+                     scrollbarColor);
+  }
+}
+
 
 bool VScroll::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags) {
   if (NULL == widget) {

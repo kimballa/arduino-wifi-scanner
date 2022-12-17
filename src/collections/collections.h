@@ -5,6 +5,7 @@
 
 #include<stddef.h>
 #include<new>
+#include<initializer_list>
 
 namespace tc {
 
@@ -32,7 +33,7 @@ namespace tc {
       }
     };
 
-    /** Copy constructor from brace-initialized array. */
+    /** Copy constructor from explicit array. */
     template<size_t N> vector(const T (&arr)[N]): _count(N) {
       if (N > initial_vector_capacity) {
         _capacity = N;
@@ -45,6 +46,21 @@ namespace tc {
         new (&(_data[i])) T(arr[i]);
       }
     };
+
+    /** Copy constructor from brace-initialized list. */
+    vector(std::initializer_list<T> lst): _count(lst.size()) {
+      if (lst.size() > initial_vector_capacity) {
+        _capacity = lst.size();
+      } else {
+        _capacity = initial_vector_capacity;
+      }
+
+      _data = reinterpret_cast<T*>(new unsigned char[sizeof(T) * _capacity]);
+      size_t i = 0;
+      for (const T* it=lst.begin(); it != lst.end(); it++) {
+        new (&(_data[i++])) T(*it);
+      }
+    }
 
     /** Move constructor. */
     vector(vector<T> &&other) noexcept: _count(other._count), _capacity(other._capacity),
@@ -82,8 +98,8 @@ namespace tc {
 
     size_t size() const { return _count; }; // number of valid elements.
     size_t capacity() const { return _capacity; }; // number of memory slots provisioned in array.
-    bool isEmpty() const { return _count == 0; };
-    void reserve(size_t minCapacity) { ensureCapacity(minCapacity - 1); };
+    bool empty() const { return _count == 0; };
+    void reserve(size_t minCapacity) { _ensure_capacity(minCapacity - 1); };
 
     void clear() {
       for (size_t i = 0; i < _count; i++) {
@@ -96,17 +112,38 @@ namespace tc {
     }
 
     /** Return true if you can use this subscript index safely. */
-    bool inRange(size_t idx) const {
+    bool in_range(size_t idx) const {
       return idx >= 0 && idx < _count;
     };
 
     // Append item to the vector, allocating more space if necessary. Returns the
     // index where the item was stored.
     size_t push_back(const T& item) {
-      ensureCapacity(_count);
+      _ensure_capacity(_count);
       // Use placement-new to initialize a T at the next array index by copy-constructing from `item`.
       new (&(_data[_count])) (T)(item);
       return _count++;
+    };
+
+    // Insert item at position `pos`, moving `pos`..`_count-1` down by 1.
+    size_t insert_at(const T& item, size_t pos) {
+      _ensure_capacity(_count);
+
+      if (pos == _count) {
+        // Same as push_back().
+        new (&(_data[_count++])) (T)(item);
+      } else {
+        // Move everything down by 1 element to make room
+        memmove(reinterpret_cast<unsigned char*>(&(_data[pos + 1])),
+            reinterpret_cast<unsigned char*>(&(_data[pos])),
+            reinterpret_cast<unsigned char*>(end()) - reinterpret_cast<unsigned char*>(&(_data[pos])));
+
+        // And then do the insert.
+        new (&(_data[pos])) (T)(item);
+        _count++;
+      }
+
+      return pos;
     };
 
     // C++ iterator interface.
@@ -139,7 +176,7 @@ namespace tc {
 
   private:
     // Ensures that `maxIdx` is a safe index into _data, resizing to grow if necessary.
-    void ensureCapacity(size_t maxIdx) {
+    void _ensure_capacity(size_t maxIdx) {
       while (maxIdx >= _capacity) {
         _capacity *= 2;
       }

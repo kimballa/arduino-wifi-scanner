@@ -4,10 +4,11 @@
 #define _HEATMAP_H
 
 #include "uiwidgets/uiwidgets.h"
+#include "collections/collections.h"
 
 class Heatmap : public UIWidget {
 public:
-  Heatmap(): UIWidget(), channels(), rssiLevels(), _color(TFT_RED) { };
+  Heatmap(): UIWidget(), _channels(), _rssiLevels(), _color(TFT_RED) { };
 
   virtual void render(TFT_eSPI &lcd);
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
@@ -21,7 +22,7 @@ public:
   // Add the signal strength for a signal heard on the specified channel.
   void addSignal(int channelNum, int rssi);
   // Discard existing signal data.
-  void clear() { channels.clear(); rssiLevels.clear(); };
+  void clear() { _channels.clear(); _rssiLevels.clear(); };
 
   void setColor(uint16_t color) { _color = color; };
 
@@ -29,8 +30,8 @@ public:
 private:
   unsigned int idxForChannelNum(int channelNum) const;
 
-  vector<int> channels;
-  vector<vector<int>> rssiLevels;
+  tc::vector<int> _channels;
+  tc::vector<tc::vector<int>> _rssiLevels;
 
   uint16_t _color;
 };

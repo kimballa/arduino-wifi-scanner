@@ -22,6 +22,7 @@
 #include<dbg.h>
 
 #include "uiwidgets/uiwidgets.h"
+#include "collections/collections.h"
 #include "heatmap.h"
 
 // Copies the specified text (up to 80 chars) into the status line buffer

@@ -6,8 +6,8 @@
 #include "wifi-scanner.h"
 
 void Heatmap::defineChannel(int channelNum) {
-  channels.push_back(channelNum); // idx 'n' points to channel # 'channelNum'.
-  rssiLevels.emplace_back(vector<int>()); // Add a vector to hold its rssi levels.
+  _channels.push_back(channelNum); // idx 'n' points to channel # 'channelNum'.
+  _rssiLevels.push_back(tc::vector<int>()); // Add a vector to hold its rssi levels.
 }
 
 void Heatmap::addSignal(int channelNum, int rssi) {
@@ -17,13 +17,13 @@ void Heatmap::addSignal(int channelNum, int rssi) {
     return;
   }
 
-  rssiLevels[channelIdx].push_back(rssi);
+  _rssiLevels[channelIdx].push_back(rssi);
 }
 
 
 unsigned int Heatmap::idxForChannelNum(int channelNum) const {
-  for (unsigned int i = 0; i < channels.size(); i++) {
-    if (channels[i] == channelNum) {
+  for (unsigned int i = 0; i < _channels.size(); i++) {
+    if (_channels[i] == channelNum) {
       return i;
     }
   }
@@ -40,18 +40,20 @@ void Heatmap::render(TFT_eSPI &lcd) {
   getChildAreaBoundingBox(childX, childY, childW, childH);
 
   constexpr int xAxisHeight = 12; // 12 px reserved for X axis.
+  constexpr int maxBlockHeightLimit = 16; // blocks are variable height, but no taller than 16 px.
 
-  int maxColWidth = childW / channels.size(); // width per col + associated padding
+  int maxColWidth = childW / _channels.size(); // width per col + associated padding
   constexpr int colPad = 2; // 2 px padding between columns.
   int colWidth = max(maxColWidth - colPad, 1);
 
   // Which channel has the most signals?
   unsigned int maxSignals = 0;
-  for (auto rssiLevelsForChannel: rssiLevels) {
+  for (auto rssiLevelsForChannel: _rssiLevels) {
     maxSignals = max(maxSignals, rssiLevelsForChannel.size());
   }
 
-  int maxBlockHeight = (childH - xAxisHeight) / maxSignals; // height per block (+ padding) within col.
+  // Height per block (+ padding) within col:
+  int maxBlockHeight = min(maxBlockHeightLimit, (childH - xAxisHeight) / maxSignals);
   constexpr int blockPad = 1; // 1 px padding between blocks in a columnar stack.
   int blockHeight = max(maxBlockHeight - blockPad, 1);
 
@@ -62,8 +64,10 @@ void Heatmap::render(TFT_eSPI &lcd) {
   // channel, in a vertical stack; tint them based on RSSI value.
   int cursorX = childX;
   int cursorY;
-  int chanIdx = 0;
-  for (auto rssiLevelsForChannel: rssiLevels) {
+  lcd.setTextColor(TFT_WHITE);
+  for (unsigned int chanIdx = 0; chanIdx < _channels.size(); chanIdx++) {
+    const tc::vector<int> &rssiLevelsForChannel = _rssiLevels[chanIdx];
+
     // Our chart starts at the bottom of our Y-axis space and grows upward.
     cursorY = childY + childH - xAxisHeight - blockHeight - 1;
     for (auto rssi : rssiLevelsForChannel) {
@@ -73,7 +77,7 @@ void Heatmap::render(TFT_eSPI &lcd) {
     }
 
     // Draw the category label below heat blocks (font 0 for small size)
-    lcd.drawNumber(channels[chanIdx++], cursorX, childY + childH - xAxisHeight + 2, 0);
+    lcd.drawNumber(_channels[chanIdx], cursorX, childY + childH - xAxisHeight + 2, 0);
 
     // Advance cursor to the right for the next column
     cursorX += colWidth + colPad;

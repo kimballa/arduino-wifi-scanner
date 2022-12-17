@@ -3,9 +3,7 @@
 #ifndef _UIW_VSCROLL_H
 #define _UIW_VSCROLL_H
 
-#include<vector>
-
-using std::vector;
+#include "../collections/collections.h"
 
 constexpr int16_t VSCROLL_SCROLLBAR_W = 12; // width of the rendered scrollbar itself
 constexpr int16_t VSCROLL_SCROLLBAR_MARGIN = 2; // px between content and scrollbar
@@ -65,7 +63,7 @@ protected:
   void renderContentArea(TFT_eSPI &lcd);
 
 private:
-  vector<UIWidget*> _entries;
+  tc::vector<UIWidget*> _entries;
   int16_t _itemHeight; // Fixed height for all elements.
   unsigned int _topIdx; // Index of the first element to display.
   unsigned int _lastIdx; // Index of the last visible element.

@@ -7,10 +7,10 @@
   * Checkbox ?
   * Radio button ?
 
-* Add a BarChart widget that lets us show the histogram of signals on each freq, separate charts
-  for 2.4G and 5Ghz.
-  ... alt, make each histogram column a bunch of square blocks, one block per count, and have
-  them be a heatmap indicating RSSI. (Stronger signals bright red, weaker signals fade to black.)
+* *** BUG: Histogram doesn't show X axis labels ***
+
+* Histogram should scale color by rssi
+* Adding channels to 2.4 GHz histogram should add crosstalk to neighbors
 
   * 802.11a/g (2.4 GHz) spectral fall-off:
     chan dist     freq dist    power

@@ -60,8 +60,8 @@ static StrLabel statusLineLabel = StrLabel(statusLine);
 
 
 // physical pushbuttons
-static vector<Button> buttons;
-static vector<uint8_t> buttonGpioPins;
+static tc::vector<Button> buttons;
+static tc::vector<uint8_t> buttonGpioPins;
 
 static constexpr unsigned int wifi24GHzChannelPlan[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
 static constexpr unsigned int wifi50GHzChannelPlan[] = {
@@ -195,14 +195,14 @@ void setup() {
     pinMode(pin, INPUT_PULLUP);
   }
 
-  buttons.emplace_back(0, scrollUpHandler);
-  buttons.emplace_back(1, scrollDownHandler);
-  buttons.emplace_back(2, emptyBtnHandler);
-  buttons.emplace_back(3, emptyBtnHandler);
-  buttons.emplace_back(4, emptyBtnHandler);
-  buttons.emplace_back(5, emptyBtnHandler);
-  buttons.emplace_back(6, emptyBtnHandler);
-  buttons.emplace_back(7, toggleHeatmapButtonHandler);
+  buttons.push_back(Button(0, scrollUpHandler));
+  buttons.push_back(Button(1, scrollDownHandler));
+  buttons.push_back(Button(2, emptyBtnHandler));
+  buttons.push_back(Button(3, emptyBtnHandler));
+  buttons.push_back(Button(4, emptyBtnHandler));
+  buttons.push_back(Button(5, emptyBtnHandler));
+  buttons.push_back(Button(6, emptyBtnHandler));
+  buttons.push_back(Button(7, toggleHeatmapButtonHandler));
 
   lcd.begin();
   lcd.setRotation(3);

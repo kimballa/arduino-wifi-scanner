@@ -10,6 +10,9 @@ constexpr int16_t VSCROLL_SCROLLBAR_MARGIN = 2; // px between content and scroll
 
 constexpr int16_t DEFAULT_VSCROLL_ITEM_HEIGHT = 16;
 
+// constant signaling that no element of a VScroll is selected.
+constexpr size_t NO_SELECTION = 0xFFFFFFFF;
+
 /**
  * A container for a variable number of entries, displayed with a scrollbar.
  *
@@ -22,32 +25,46 @@ constexpr int16_t DEFAULT_VSCROLL_ITEM_HEIGHT = 16;
  */
 class VScroll : public UIWidget {
 public:
-  VScroll(): UIWidget(), _entries(), _itemHeight(DEFAULT_VSCROLL_ITEM_HEIGHT),
-      _topIdx(0), _lastIdx(0), _scrollbar_bg_color(TFT_BLACK),
+  VScroll(): UIWidget(), _entries(),
+      _topIdx(0), _lastIdx(0), _selectIdx(NO_SELECTION), _priorSelectIdx(NO_SELECTION),
+      _itemHeight(DEFAULT_VSCROLL_ITEM_HEIGHT),
+      _scrollbar_bg_color(TFT_BLACK),
       _content_bg_color(TRANSPARENT_COLOR) {};
 
   // Add the specified widget to the end of the list.
   void add(UIWidget *widget) { _entries.push_back(widget); cascadeBoundingBox(); };
   // Remove the specified widget from the list.
   void remove(UIWidget *widget);
-  void clear() { _entries.clear(); cascadeBoundingBox(); }; // Remove all widgets from the list.
+  // Remove all widgets from the list.
+  void clear() {
+    _entries.clear();
+    _selectIdx = NO_SELECTION;
+    _priorSelectIdx = NO_SELECTION;
+    cascadeBoundingBox();
+  };
 
   // Return number of entries in the list.
-  unsigned int count() const { return _entries.size(); };
-  unsigned int position() const { return _topIdx; }; // idx of the elem @ the top of the viewport
-  unsigned int bottomIdx() const { return _lastIdx; }; // idx of the elem @ the bottom of the viewport.
+  size_t count() const { return _entries.size(); };
+  size_t position() const { return _topIdx; }; // idx of the elem @ the top of the viewport
+  size_t bottomIdx() const { return _lastIdx; }; // idx of the elem @ the bottom of the viewport.
 
   virtual void render(TFT_eSPI &lcd) { render(lcd, RF_NONE); };
   void render(TFT_eSPI &lcd, uint32_t renderFlags);
-  void renderScrollUp(TFT_eSPI &lcd, bool btnActive);
-  void renderScrollDown(TFT_eSPI &lcd, bool btnActive);
+  void renderScrollUp(TFT_eSPI &lcd, bool btnActive); // Render the up-facing scrollbar chevron
+  void renderScrollDown(TFT_eSPI &lcd, bool btnActive); // Render the down-facing scrollbar chevron
   virtual void cascadeBoundingBox();
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
 
   bool scrollUp(); // scroll 1 element higher.
-  bool scrollTo(unsigned int idx); // specify the idx of the elem to show @ the top of the scroll box.
+  bool scrollTo(size_t idx); // specify the idx of the elem to show @ the top of the scroll box.
   bool scrollDown(); // scroll 1 element lower.
+
+  bool setSelection(size_t idx); // specify the idx of an elem to select.
+  bool selectUp(); // select the element 1 above the current one.
+  bool selectDown(); // select the element 1 lower than the current one.
+  size_t selectId() const { return _selectIdx; }; // return idx of selected element.
+  UIWidget* getSelected() const; // Return the selected elem (or NULL if none).
 
   // Specify height available to each entry to render within.
   void setItemHeight(int16_t newItemHeight);
@@ -63,11 +80,18 @@ protected:
   void renderContentArea(TFT_eSPI &lcd);
 
 private:
-  tc::vector<UIWidget*> _entries;
-  int16_t _itemHeight; // Fixed height for all elements.
-  unsigned int _topIdx; // Index of the first element to display.
-  unsigned int _lastIdx; // Index of the last visible element.
+  bool _setSelection(size_t idx);
 
+  tc::vector<UIWidget*> _entries;
+
+  size_t _topIdx; // Index of the first element to display.
+  size_t _lastIdx; // Index of the last visible element.
+  size_t _selectIdx; // Index of a selected element, if any (or NO_SELECTION otherwise).
+  size_t _priorSelectIdx; // Index of previously-selected element, if any (or NO_SELECTION).
+                          // Tracked so we can re-render this element w/o focus when we re-render
+                          // the newly-focused _selectIdx entry.
+
+  int16_t _itemHeight; // Fixed height for all elements.
   uint16_t _scrollbar_bg_color;
   uint16_t _content_bg_color;
 };

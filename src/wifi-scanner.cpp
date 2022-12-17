@@ -107,7 +107,7 @@ static tc::vector<int> spectralMask80211G = { 0, -10, -26, -28 };
 // +/- 30 MHz:  -25 dBm
 // +/- 35 MHz:  -27 dBm
 // +/- 40 MHz:  -30 dBm
-// TODO(aaron): This is incorrect mask; it doesn't handle the fact that the center of the 
+// TODO(aaron): This is incorrect mask; it doesn't handle the fact that the center of the
 // true channel is offset from the reported primary channel and we need to look at the data
 // struct to see whether the true center is above or below the primary channel id.
 //
@@ -193,11 +193,26 @@ static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
   }
 
   // Button released; perform action.
-  if (wifiListScroll.scrollUp()) {
-    screen.renderWidget(&wifiListScroll, RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT);
-  } else {
+  bool scrollOK = wifiListScroll.scrollUp();
+  bool selectOK = wifiListScroll.selectUp();
+
+  uint32_t flags = 0;
+  if (scrollOK) {
+    flags |= RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT;
+  }
+
+  if (selectOK) {
+    flags |= RF_VSCROLL_SELECTED;
+  }
+
+  if (!scrollOK) {
     // Cannot scroll further up. Only redraw the up-caret to finish the animation.
     wifiListScroll.renderScrollUp(lcd, false);
+  }
+
+  if (flags) {
+    // Some portion of the widget broader than the scrollbar arrow needs redrawing.
+    screen.renderWidget(&wifiListScroll, flags);
   }
 }
 
@@ -209,11 +224,26 @@ static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
   }
 
   // Button released; perform action.
-  if (wifiListScroll.scrollDown()) {
-    screen.renderWidget(&wifiListScroll, RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT);
-  } else {
-    // Cannot scroll further down. Only redraw the down-caret to finish the animation.
+  bool scrollOK = wifiListScroll.scrollDown();
+  bool selectOK = wifiListScroll.selectDown();
+
+  uint32_t flags = 0;
+  if (scrollOK) {
+    flags |= RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT;
+  }
+
+  if (selectOK) {
+    flags |= RF_VSCROLL_SELECTED;
+  }
+
+  if (!scrollOK) {
+    // Cannot scroll further up. Only redraw the down-caret to finish the animation.
     wifiListScroll.renderScrollDown(lcd, false);
+  }
+
+  if (flags) {
+    // Some portion of the widget broader than the scrollbar arrow needs redrawing.
+    screen.renderWidget(&wifiListScroll, flags);
   }
 }
 
@@ -485,6 +515,8 @@ static void scanWifi() {
       makeWifiRow(i);
     }
   }
+
+  wifiListScroll.setSelection(0);
 }
 
 

@@ -6,13 +6,30 @@
 static constexpr int16_t scrollBoxWidgetHeight = 12;
 
 void VScroll::remove(UIWidget *widget) {
+  size_t idx = 0;
   for (auto it = _entries.begin(); it != _entries.end(); it++) {
     if (*it == widget) {
       // Erase the element at cur iterator position.
       _entries.erase(it);
+
+      // Move selection cursors up by 1 if they're below this, or remove if they're on this entry.
+      if (_selectIdx != NO_SELECTION && _selectIdx > idx) {
+        _selectIdx--;
+      } else if (_selectIdx == idx) {
+        _selectIdx = NO_SELECTION;
+      }
+
+      if (_priorSelectIdx != NO_SELECTION && _priorSelectIdx > idx) {
+        _priorSelectIdx--;
+      } else if (_priorSelectIdx == idx) {
+        _priorSelectIdx = NO_SELECTION;
+      }
+
       cascadeBoundingBox();
       return; // All done.
     }
+
+    idx++;
   }
 }
 
@@ -23,8 +40,29 @@ void VScroll::render(TFT_eSPI &lcd, uint32_t renderFlags) {
     lcd.fillRect(_x, _y, _w - VSCROLL_SCROLLBAR_W, _h, _content_bg_color);
   }
 
-  renderScrollbar(lcd);
-  renderContentArea(lcd);
+  if ((renderFlags & RF_WIDGET_SPECIFIC) == 0
+      || (renderFlags & RF_VSCROLL_SCROLLBAR) == RF_VSCROLL_SCROLLBAR) {
+    // We should draw the scrollbar (explicit directive, or no widget-specific guidance / draw all).
+    renderScrollbar(lcd);
+  }
+
+  if ((renderFlags & RF_WIDGET_SPECIFIC) == 0
+      || (renderFlags & RF_VSCROLL_CONTENT) == RF_VSCROLL_CONTENT) {
+    // We should draw all the content (explicit directive, or no widget-specific guidance / draw all).
+    renderContentArea(lcd);
+  } else if ((renderFlags & RF_VSCROLL_SELECTED) == RF_VSCROLL_SELECTED) {
+    // We should redraw only the content area rows indicated by _selectIdx and _priorSelectIdx.
+
+    // Iterate through all the visible entries and render the appropriate ones.
+    for (size_t i = _topIdx; i < _lastIdx; i++) {
+      if (i == _selectIdx || i == _priorSelectIdx) {
+        UIWidget *pEntry = _entries[i];
+        if (pEntry != NULL) {
+          pEntry->render(lcd);
+        }
+      }
+    }
+  }
 }
 
 void VScroll::renderScrollbar(TFT_eSPI &lcd) {
@@ -72,8 +110,8 @@ void VScroll::renderScrollbar(TFT_eSPI &lcd) {
 }
 
 void VScroll::renderContentArea(TFT_eSPI &lcd) {
-  // Iterate through all the entries and render them.
-  for (unsigned int i = _topIdx; i < _lastIdx; i++) {
+  // Iterate through all the visible entries and render them.
+  for (size_t i = _topIdx; i < _lastIdx; i++) {
     UIWidget *pEntry = _entries[i];
     if (pEntry != NULL) {
       pEntry->render(lcd);
@@ -143,22 +181,7 @@ bool VScroll::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t render
   if (NULL == widget) {
     return false;
   } else if (this == widget) {
-    bool partialRedraw = false;
-
-    if ((renderFlags & RF_VSCROLL_CONTENT) == RF_VSCROLL_CONTENT) {
-
-      partialRedraw = true;
-    }
-
-    if ((renderFlags & RF_VSCROLL_SCROLLBAR) == RF_VSCROLL_SCROLLBAR) {
-      partialRedraw = true;
-    }
-
-    if (!partialRedraw) {
-      // If we weren't requested to render specific components of this widget, redraw all of it.
-      render(lcd, renderFlags);
-    }
-
+    render(lcd, renderFlags);
     return true;
   } else if (containsWidget(widget)) {
     // This widget thinks its inside our bounding box. It's definitely a child of this
@@ -173,7 +196,7 @@ bool VScroll::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t render
     // So we do a full re-render of the pEntry with the bounding box that contains 'widget'.
 
     // Iterate through all the entries and check.
-    for (unsigned int i = _topIdx; i < _lastIdx; i++) {
+    for (size_t i = _topIdx; i < _lastIdx; i++) {
       UIWidget *pEntry = _entries[i];
       if (pEntry != NULL && pEntry->containsWidget(widget)) {
         // Found a visible row that applies to this widget.
@@ -211,7 +234,7 @@ void VScroll::cascadeBoundingBox() {
   // Adjust width to provide room for the scrollbar.
   childW -= VSCROLL_SCROLLBAR_W + VSCROLL_SCROLLBAR_MARGIN;
 
-  unsigned int idx = 0;
+  size_t idx = 0;
   for (auto it = _entries.begin(); it < _entries.end() && childH > 0; idx++, it++) {
     if (idx < _topIdx) {
       // Not part of the visible set of entries; just skip it.
@@ -260,7 +283,7 @@ bool VScroll::scrollUp() {
 }
 
 // specify the idx of the elem to show @ the top of the scroll box.
-bool VScroll::scrollTo(unsigned int idx) {
+bool VScroll::scrollTo(size_t idx) {
   if (idx < _entries.size()) {
     _topIdx = idx;
     cascadeBoundingBox();
@@ -283,4 +306,72 @@ bool VScroll::scrollDown() {
   _topIdx++;
   cascadeBoundingBox();
   return true;
+}
+
+bool VScroll::setSelection(size_t selId) {
+  if (selId >= _entries.size()) {
+    return _setSelection(NO_SELECTION);
+  }
+
+  return _setSelection(selId);
+}
+
+// Select the element one above this one. If no element is selected, select the first.
+bool VScroll::selectUp() {
+  if (_selectIdx == NO_SELECTION) {
+    // Nothing is yet selected. Select the 1st item.
+    if (_entries.size() > 0) {
+      return _setSelection(0);
+    } else {
+      // Impossible to select anything.
+      return _setSelection(NO_SELECTION);
+    }
+  } else if (_selectIdx > 0 && _selectIdx - 1 < _entries.size()) {
+    return _setSelection(_selectIdx - 1);
+  }
+
+  // Impossible to change state; we are already at _selectIdx == 0.
+  return false;
+}
+
+// Select the next item. If nothing is selected, select the first entry.
+bool VScroll::selectDown() {
+  if (_selectIdx == NO_SELECTION) {
+    // Nothing is yet selected. Select the 1st item.
+    if (_entries.size() > 0) {
+      return _setSelection(0);
+    } else {
+      // Impossible to select anything.
+      return _setSelection(NO_SELECTION);
+    }
+  } else if (_selectIdx + 1 < _entries.size()) {
+    return _setSelection(_selectIdx + 1);
+  }
+
+  // Impossible to change state; we are already at _selectIdx == size() - 1.
+  return false;
+}
+
+// Confirm the validated change in selection focus among our elements
+bool VScroll::_setSelection(size_t idx) {
+  _priorSelectIdx = _selectIdx;
+  _selectIdx = idx;
+
+  if (_priorSelectIdx != NO_SELECTION && _entries[_priorSelectIdx] != NULL) {
+    _entries[_priorSelectIdx]->setFocus(false);
+  }
+
+  if (_selectIdx != NO_SELECTION && _entries[_selectIdx] != NULL) {
+    _entries[_selectIdx]->setFocus(true);
+  }
+
+  return idx != NO_SELECTION;
+}
+
+UIWidget* VScroll::getSelected() const {
+  if (_selectIdx == NO_SELECTION) {
+    return NULL;
+  }
+
+  return _entries[_selectIdx];
 }

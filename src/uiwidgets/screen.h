@@ -47,6 +47,7 @@ constexpr uint32_t RF_WIDGET_SPECIFIC   =  0x1000; // Indicates widget-specific 
 // Render flags specific to the VScroll widget.
 constexpr uint32_t RF_VSCROLL_CONTENT   = 0x10000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
 constexpr uint32_t RF_VSCROLL_SCROLLBAR = 0x20000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
+constexpr uint32_t RF_VSCROLL_SELECTED  = 0x40000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
 
 
 

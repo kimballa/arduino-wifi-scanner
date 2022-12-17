@@ -134,9 +134,12 @@ namespace tc {
         new (&(_data[_count++])) (T)(item);
       } else {
         // Move everything down by 1 element to make room
+        size_t move_bytes = reinterpret_cast<const unsigned char*>(end()) -
+            reinterpret_cast<const unsigned char*>(&(_data[pos]));
+
         memmove(reinterpret_cast<unsigned char*>(&(_data[pos + 1])),
-            reinterpret_cast<unsigned char*>(&(_data[pos])),
-            reinterpret_cast<unsigned char*>(end()) - reinterpret_cast<unsigned char*>(&(_data[pos])));
+            reinterpret_cast<const unsigned char*>(&(_data[pos])),
+            move_bytes);
 
         // And then do the insert.
         new (&(_data[pos])) (T)(item);

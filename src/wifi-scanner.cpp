@@ -63,6 +63,7 @@ static StrLabel statusLineLabel = StrLabel(statusLine);
 static tc::vector<Button> buttons;
 static tc::vector<uint8_t> buttonGpioPins;
 
+// Arrays that define the channel numbers in each frequency range (US FCC band plan).
 static constexpr unsigned int wifi24GHzChannelPlan[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
 static constexpr unsigned int wifi50GHzChannelPlan[] = {
   32, 36, 40, 44, 48,        // U-NII-1 channels, unrestricted

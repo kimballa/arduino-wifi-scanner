@@ -32,7 +32,17 @@ void Heatmap::addSignal(int channelNum, int rssi) {
     return;
   }
 
-  _rssiLevels[channelIdx].push_back(rssi);
+  tc::vector<int> &rssiLvls = _rssiLevels[channelIdx];
+  for (size_t i = 0; i < rssiLvls.size(); i++) {
+    if (rssiLvls[i] < rssi) {
+      // Insert here.
+      rssiLvls.insert_at(rssi, i);
+      return;
+    }
+  }
+
+  // This is weaker than anything we've seen yet, add it to the end.
+  rssiLvls.push_back(rssi);
 }
 
 

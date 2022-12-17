@@ -74,10 +74,61 @@ static constexpr unsigned int wifi50GHzChannelPlan[] = {
   // 169, 173, 177,             // U-NII-4 1W, indoor usage only (since 2020)
 };
 
+/**
+ * The 802.11b spectral mask specifies that the signal overlaps adjacent channels
+ * in the following way:
+ * at +/- 5 MHz (1 channel away): 0 dBm signal diff
+ * at +/-10 MHz (2 channels out): 0 dBm
+ * at +/-15 MHz (3 channels out): -30 dBm
+ * at +/-20 MHz (4 channels out): -30 dBm
+ * Further out is -50 dBm, effectively no interference.
+ * (See https://www.rfcafe.com/references/electrical/wlan-masks.htm)
+ *
+ * The spectral mask definitions here are one-sided, but are applied symmetrically around
+ * the primary (center) channel.
+ */
+static tc::vector<int> spectralMask80211B = { 0, 0, -30, -30 };
+
+// 802.11a and g have the following mask, along with 20 MHz 802.11n:
+// +/-  5 MHz:     0 dBm
+// +/- 10 MHz:   -10 dBm
+// +/- 15 MHz:   -26 dBm (actually -25.9 dBm)
+// +/- 20 MHz:   -28 dBm
+// Further out is -35 dBm or lower; non-interfering.
+static tc::vector<int> spectralMask80211G = { 0, -10, -26, -28 };
+
+// 802.11n in 40 MHz mode on 2.4 GHz wifi blocks an enormous number of channels:
+// +/-  5 MHz:    0 dBm
+// +/- 10 MHz:    0 dBm
+// +/- 15 MHz:    0 dBm
+// +/- 20 MHz:  -10 dBm
+// +/- 25 MHz:  -22 dBm
+// +/- 30 MHz:  -25 dBm
+// +/- 35 MHz:  -27 dBm
+// +/- 40 MHz:  -30 dBm
+// TODO(aaron): This is incorrect mask; it doesn't handle the fact that the center of the 
+// true channel is offset from the reported primary channel and we need to look at the data
+// struct to see whether the true center is above or below the primary channel id.
+//
+// See https://www.researchgate.net/figure/80211-spectral-masks_fig3_261382549
+static tc::vector<int> spectralMask80211N40MHz24G = { 0, 0, 0, -10, -22, -25, -27, -30 };
+
+// 802.11n in 40 MHz mode on 5 GHz wifi (20 MHz channel spacing):
+// TODO(aaron): Adjust for offset true channel center.
+static tc::vector<int> spectralMask80211N40MHz50G = { 0, -10, -30 };
+
+static tc::vector<int> emptySpectralMask = {};
+
+// Ignore signals with power < -90 dBm when constructing the interference heatmap.
+static constexpr int noiseFloorDBm = -90;
+
+// Max 2.4 GHz channel id in US band plan is 11.
+static constexpr int max24GHzChannelNum = 11;
+
 /** Return the heatmap associated with a particular channel. */
 static Heatmap *getHeatmapForChannel(int chan) {
   // TODO(aaron): This will always return a heatmap, including for invalid channels. OK?
-  if (chan < 12) {
+  if (chan <= max24GHzChannelNum) {
     return &wifi24GHzHeatmap;
   } else {
     return &wifi50GHzHeatmap;
@@ -289,7 +340,6 @@ void setup() {
   setStatusLine("Scan complete.");
 }
 
-static String ssids[SCAN_MAX_NUMBER];
 static StrLabel* ssidLabels[SCAN_MAX_NUMBER];
 static IntLabel* chanLabels[SCAN_MAX_NUMBER];
 static IntLabel* rssiLabels[SCAN_MAX_NUMBER];
@@ -297,26 +347,89 @@ static String bssids[SCAN_MAX_NUMBER];
 static StrLabel* bssidLabels[SCAN_MAX_NUMBER];
 static Cols* wifiRows[SCAN_MAX_NUMBER]; // Each row is a Cols for (ssid, chan, rssi, bssid)
 
+static void recordSignalHeatmap(int wifiIdx, const wifi_ap_record_t *pWifiAPRecord) {
+  // Now that we have channel & RSSI, register this on the appropriate heatmap.
+  int channelNum = pWifiAPRecord->primary;
+  int rssiVal = pWifiAPRecord->rssi;
+
+  // Get the appropriate heatmap (2.4 GHz or 5 GHz) based on the channel id.
+  Heatmap *bandHeatmap = getHeatmapForChannel(channelNum);
+
+  // Record the rssi of this ssid on its primary channel in the heatmap.
+  bandHeatmap->addSignal(channelNum, rssiVal);
+
+  bool is24GHz = channelNum <= max24GHzChannelNum;
+  tc::vector<int> *pSpectralMask = NULL;
+
+  // Determine which protocol(s) are active and load the appropriate cross-channel interference data.
+  if (pWifiAPRecord->phy_11b) {
+    // We are on 2.4 GHz 802.11b. (g or n may also be enabled, but the mask for 802.11b is
+    // more punishing to nearby channels, so apply this one to the interference chart.)
+    pSpectralMask = &spectralMask80211B;
+  } else if (pWifiAPRecord->phy_11n) {
+    // We are on 802.11n.
+    if (pWifiAPRecord->second == wifi_second_chan_t::WIFI_SECOND_CHAN_NONE) {
+      // 20 MHz bandwidth.
+      if (is24GHz) {
+        // 20 MHz 2.4 GHz 802.11n shares spectral mask with 802.11g
+        pSpectralMask = &spectralMask80211G;
+      } else {
+        // 20 MHz 5 GHz 802.11n does not interfere with any adjacent channels.
+        pSpectralMask = &emptySpectralMask;
+      }
+    } else {
+      // 40 MHz bandwidth
+      if (is24GHz) {
+        // We are going to interfere with basically all the channels.
+        pSpectralMask = &spectralMask80211N40MHz24G;
+      } else {
+        pSpectralMask = &spectralMask80211N40MHz50G;
+      }
+    }
+  } else {
+    // We are on 2.4 GHz 802.11g
+    pSpectralMask = &spectralMask80211G;
+  }
+
+  if (is24GHz) {
+    int offset = 1;
+    for (int dbm: *pSpectralMask) {
+      int crosstalkRssi = rssiVal + dbm;
+      if (crosstalkRssi >= noiseFloorDBm) {
+        if (channelNum + offset <= max24GHzChannelNum) {
+          bandHeatmap->addSignal(channelNum + offset, crosstalkRssi);
+        }
+
+        if (channelNum - offset > 0) {
+          bandHeatmap->addSignal(channelNum - offset, crosstalkRssi);
+        }
+      }
+
+      offset++;
+    }
+  } else {
+    // TODO(aaron): 5 GHz interference
+  }
+}
+
 static void makeWifiRow(int wifiIdx) {
-  ssids[wifiIdx] = String(WiFi.SSID(wifiIdx));
-  StrLabel *ssid = new StrLabel(ssids[wifiIdx].c_str());
+  const wifi_ap_record_t *pWifiAPRecord =
+      reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(wifiIdx));
+
+  StrLabel *ssid = new StrLabel(reinterpret_cast<const char*>(&(pWifiAPRecord->ssid[0])));
   ssid->setFont(2); // Use larger 16px font for SSID.
   ssidLabels[wifiIdx] = ssid;
 
-  int channelNum = WiFi.channel(wifiIdx);
+  int channelNum = pWifiAPRecord->primary;
   IntLabel *chan = new IntLabel(channelNum);
   chan->setPadding(0, 0, 4, 0); // Push default small font to middle of row height.
   chanLabels[wifiIdx] = chan;
 
-  int rssiVal = WiFi.RSSI(wifiIdx);
-  IntLabel *rssi = new IntLabel(rssiVal);
+  IntLabel *rssi = new IntLabel(pWifiAPRecord->rssi);
   rssi->setPadding(0, 0, 4, 0);
   rssiLabels[wifiIdx] = rssi;
 
-  // Now that we have channel & RSSI, register this on the appropriate heatmap.
-  getHeatmapForChannel(channelNum)->addSignal(channelNum, rssiVal);
-
-  bssids[wifiIdx] = String(WiFi.BSSIDstr(wifiIdx));
+  bssids[wifiIdx] = String(WiFi.BSSIDstr(wifiIdx)); // Formats 6-octet BSSID to hex str.
   StrLabel *bssid = new StrLabel(bssids[wifiIdx].c_str());
   bssid->setPadding(0, 0, 4, 0);
   bssidLabels[wifiIdx] = bssid;
@@ -335,6 +448,9 @@ static void makeWifiRow(int wifiIdx) {
 
   wifiRows[wifiIdx] = wifiRow;
   wifiListScroll.add(wifiRow);
+
+  // Also add this wifi signal to the appropriate heatmap.
+  recordSignalHeatmap(wifiIdx, pWifiAPRecord);
 }
 
 
@@ -346,7 +462,6 @@ static void scanWifi() {
 
   // Initialize all our arrays to have no data / NULL ptrs.
   for (int i = 0; i < SCAN_MAX_NUMBER; i++) {
-    ssids[i] = String();
     bssids[i] = String();
   }
 

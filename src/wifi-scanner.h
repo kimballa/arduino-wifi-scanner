@@ -6,13 +6,14 @@
 // C/C++ includes
 #include<cstring>
 
-// Arduino
+// Arduino itself
 #include<Arduino.h>
 
 // Libraries
-#include<rpcWiFi.h>
+#include<rpcWiFi.h> // Seeed rpcWiFi
 #include<rtl_wifi/wifi_constants.h>
-#include<TFT_eSPI.h>
+#include<esp/esp_wifi_types.h> // Seeed rpcUnified
+#include<TFT_eSPI.h> // Seeed LCD
 #include<debounce.h>
 
 #define DEBUG
@@ -21,8 +22,8 @@
 //#define DBG_START_PAUSED
 #include<dbg.h>
 
-#include "uiwidgets/uiwidgets.h"
 #include "collections/collections.h"
+#include "uiwidgets/uiwidgets.h"
 #include "heatmap.h"
 
 // Copies the specified text (up to 80 chars) into the status line buffer

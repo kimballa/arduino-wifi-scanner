@@ -108,7 +108,7 @@ protected:
   /** Get area bounding box available for rendering within the context of any border or other
    * padding that belongs to this widget.
    */
-  void getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t &childW, int16_t &childH);
+  void getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t &childW, int16_t &childH) const;
 
   /** Adds required margin for L/R border to specified content width. */
   int16_t addBorderWidth(int16_t contentWidth) const;

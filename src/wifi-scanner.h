@@ -22,6 +22,7 @@
 #include<dbg.h>
 
 #include "uiwidgets/uiwidgets.h"
+#include "heatmap.h"
 
 // Copies the specified text (up to 80 chars) into the status line buffer
 // and renders it to the bottom of the screen. If immediateRedraw=false,

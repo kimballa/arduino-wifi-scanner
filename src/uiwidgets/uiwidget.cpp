@@ -138,7 +138,9 @@ bool UIWidget::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t rende
   return false;
 }
 
-void UIWidget::getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t &childW, int16_t &childH) {
+void UIWidget::getChildAreaBoundingBox(int16_t &childX, int16_t &childY, int16_t &childW,
+    int16_t &childH) const {
+
   // The bounding box for a whole-content child is the same as that of this object,
   // unless there's a border, in which case we need to give that border some breathing room.
 
@@ -235,7 +237,7 @@ void UIWidget::drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd, uint32
     return; // Nothing to draw.
   }
 
-  if ((renderFlags & RF_NO_BACKGROUNDS) == 0) {
+  if ((renderFlags & RF_NO_BACKGROUNDS) == 1) {
     return; // Don't draw backgrounds in this refresh process.
   }
 

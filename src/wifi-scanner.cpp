@@ -97,14 +97,17 @@ void rotateContentCarousel() {
     // TODO(aaron): Note code clone of these 2 rows in setup().
     rowLayout.setRow(1, &dataHeaderRow, 16);          // Add back header row.
     rowLayout.setRow(2, &wifiScrollContainer, EQUAL); // VScroll expands to fill available space.
+    setStatusLine("Scan complete.");
     break;
   case ContentCarousel_Heatmap24:
     rowLayout.setRow(1, NULL, 0); // Blank out header row above vscroll.
     rowLayout.setRow(2, &wifi24GHzHeatmap, EQUAL); // Put in the 2.4 GHz spectrum heatmap
+    setStatusLine("2.4 GHz spectrum congestion");
     break;
   case ContentCarousel_Heatmap50:
     rowLayout.setRow(1, NULL, 0); // Blank out header row above vscroll.
     rowLayout.setRow(2, &wifi50GHzHeatmap, EQUAL); // Put in the 5 GHz spectrum heatmap
+    setStatusLine("5 GHz spectrum congestion");
     break;
   default:
     // ??? How'd we get here? Conform the data so it rotates back to the signal list.
@@ -268,7 +271,7 @@ void setup() {
   hdrBssid.setPadding(0, 0, 2, 0);
 
   statusLineLabel.setBackground(TFT_BLUE);
-  statusLineLabel.setPadding(2, 0, 2, 0);
+  statusLineLabel.setPadding(2, 0, 3, 0);
 
   // Set up channel plans in heatmaps.
   for (auto channel: wifi24GHzChannelPlan) {

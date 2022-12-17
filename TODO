@@ -7,9 +7,6 @@
   * Checkbox ?
   * Radio button ?
 
-* *** BUG: Histogram doesn't show X axis labels ***
-
-* Histogram should scale color by rssi
 * Adding channels to 2.4 GHz histogram should add crosstalk to neighbors
 
   * 802.11a/g (2.4 GHz) spectral fall-off:

@@ -6,6 +6,7 @@
 #include<stddef.h>
 #include<new>
 #include<initializer_list>
+#include<type_traits>
 
 namespace tc {
 
@@ -205,9 +206,11 @@ namespace tc {
     void reserve(size_t minCapacity) { _ensure_capacity(minCapacity - 1); };
 
     void clear() {
-      for (size_t i = 0; i < _count; i++) {
-        // Explicitly call destructor for each item one-by-one.
-        _data[i].~T();
+      if constexpr(!std::is_scalar<T>::value) {
+        for (size_t i = 0; i < _count; i++) {
+          // Explicitly call destructor for each item one-by-one.
+          _data[i].~T();
+        }
       }
 
       // Set count=0 on the way out.
@@ -303,9 +306,11 @@ namespace tc {
         return; // Nothing to do.
       }
 
-      for (size_t i = 0; i < _count; i++) {
-        // Explicitly call destructor for each item one-by-one.
-        _data[i].~T();
+      if constexpr(!std::is_scalar<T>::value) {
+        for (size_t i = 0; i < _count; i++) {
+          // Explicitly call destructor for each item one-by-one.
+          _data[i].~T();
+        }
       }
 
       // Free memory without triggering object destructors during delete[].

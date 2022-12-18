@@ -56,9 +56,9 @@ unsigned int Heatmap::idxForChannelNum(int channelNum) const {
   return CHANNEL_NOT_FOUND; // Couldn't find it.
 }
 
-void Heatmap::render(TFT_eSPI &lcd) {
-  drawBackground(lcd);
-  drawBorder(lcd);
+void Heatmap::render(TFT_eSPI &lcd, uint32_t renderFlags) {
+  drawBackground(lcd, renderFlags);
+  drawBorder(lcd, renderFlags);
 
   // Establish our available canvas space inside of padding, etc.
   int16_t childX, childY, childW, childH;

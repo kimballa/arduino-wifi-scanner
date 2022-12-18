@@ -3,10 +3,10 @@
 
 #include "uiwidgets.h"
 
-void Screen::render() {
+void Screen::render(uint32_t renderFlags) {
   _lcd.fillScreen(_bgColor);
   if (NULL != _widget) {
-    _widget->render(_lcd);
+    _widget->render(_lcd, renderFlags);
   }
 }
 

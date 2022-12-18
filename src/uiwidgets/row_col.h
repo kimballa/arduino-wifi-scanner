@@ -10,7 +10,7 @@ public:
   Rows(uint16_t numRows);
   ~Rows();
 
-  virtual void render(TFT_eSPI &lcd);
+  virtual void render(TFT_eSPI &lcd, uint32_t renderFlags);
   virtual void cascadeBoundingBox();
 
   void setNumRows(uint16_t numRows); // update number of rows. Properties like fixed height do not carry
@@ -39,7 +39,7 @@ public:
   Cols(uint16_t numCols);
   ~Cols();
 
-  virtual void render(TFT_eSPI &lcd);
+  virtual void render(TFT_eSPI &lcd, uint32_t renderFlags);
   virtual void cascadeBoundingBox();
 
   void setNumCols(uint16_t numCols); // update number of cols. Properties like fixed height do not carry

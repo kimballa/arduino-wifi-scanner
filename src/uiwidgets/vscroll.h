@@ -4,6 +4,7 @@
 #define _UIW_VSCROLL_H
 
 #include "../collections/collections.h"
+#include "screen.h"
 
 constexpr int16_t VSCROLL_SCROLLBAR_W = 12; // width of the rendered scrollbar itself
 constexpr int16_t VSCROLL_SCROLLBAR_MARGIN = 2; // px between content and scrollbar
@@ -12,6 +13,11 @@ constexpr int16_t DEFAULT_VSCROLL_ITEM_HEIGHT = 16;
 
 // constant signaling that no element of a VScroll is selected.
 constexpr size_t NO_SELECTION = 0xFFFFFFFF;
+
+// Render flags specific to the VScroll widget.
+constexpr uint32_t RF_VSCROLL_CONTENT   = 0x10000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
+constexpr uint32_t RF_VSCROLL_SCROLLBAR = 0x20000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
+constexpr uint32_t RF_VSCROLL_SELECTED  = 0x40000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
 
 /**
  * A container for a variable number of entries, displayed with a scrollbar.
@@ -48,10 +54,11 @@ public:
   size_t position() const { return _topIdx; }; // idx of the elem @ the top of the viewport
   size_t bottomIdx() const { return _lastIdx; }; // idx of the elem @ the bottom of the viewport.
 
-  virtual void render(TFT_eSPI &lcd) { render(lcd, RF_NONE); };
-  void render(TFT_eSPI &lcd, uint32_t renderFlags);
-  void renderScrollUp(TFT_eSPI &lcd, bool btnActive); // Render the up-facing scrollbar chevron
-  void renderScrollDown(TFT_eSPI &lcd, bool btnActive); // Render the down-facing scrollbar chevron
+  virtual void render(TFT_eSPI &lcd, uint32_t renderFlags);
+  // Render the up-facing scrollbar chevron
+  void renderScrollUp(TFT_eSPI &lcd, bool btnActive, uint32_t renderFlags=0);
+  // Render the down-facing scrollbar chevron
+  void renderScrollDown(TFT_eSPI &lcd, bool btnActive, uint32_t renderFlags=0);
   virtual void cascadeBoundingBox();
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
@@ -76,8 +83,8 @@ public:
   void setScrollbarBackground(uint16_t color) { _scrollbar_bg_color = color; };
 
 protected:
-  void renderScrollbar(TFT_eSPI &lcd);
-  void renderContentArea(TFT_eSPI &lcd);
+  void _renderScrollbar(TFT_eSPI &lcd, uint32_t renderFlags);
+  void _renderContentArea(TFT_eSPI &lcd, uint32_t renderFlags);
 
 private:
   bool _setSelection(size_t idx);

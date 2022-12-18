@@ -59,7 +59,7 @@ public:
   };
 
   /** Render the widget to the screen, along with any child widgets. */
-  virtual void render(TFT_eSPI &lcd) = 0;
+  virtual void render(TFT_eSPI &lcd, uint32_t renderFlags) = 0;
 
   /** Set the bounding box for this widget. */
   void setBoundingBox(int16_t x, int16_t y, int16_t w, int16_t h);
@@ -88,7 +88,11 @@ public:
   // Return height required for widget to render all content without overflow.
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const = 0;
 
+  // Return true if this item is explicitly focused with this->setFocus(true).
   bool isFocused() const { return _focused; };
+  // Return true if this item is explicitly focused, or has inherited focus from parent widget
+  // for this rendering context.
+  bool isFocused(uint32_t renderFlags) const;
   void setFocus(bool focus) { _focused = focus; };
 
   void setPadding(int16_t padL, int16_t padR, int16_t padT, int16_t padB);
@@ -101,8 +105,8 @@ public:
   virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags=0);
 
 protected:
-  void drawBorder(TFT_eSPI &lcd);
-  void drawBackground(TFT_eSPI &lcd);
+  void drawBorder(TFT_eSPI &lcd, uint32_t renderFlags);
+  void drawBackground(TFT_eSPI &lcd, uint32_t renderFlags);
   void drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags=0);
 
   /** Get area bounding box available for rendering within the context of any border or other

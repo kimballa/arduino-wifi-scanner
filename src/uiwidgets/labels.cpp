@@ -3,16 +3,16 @@
 #include "uiwidgets.h"
 #include <math.h>
 
-void Label::render(TFT_eSPI &lcd) {
-  drawBackground(lcd);
-  drawBorder(lcd);
+void Label::render(TFT_eSPI &lcd, uint32_t renderFlags) {
+  drawBackground(lcd, renderFlags);
+  drawBorder(lcd, renderFlags);
 
   // Render the text within the child area bounding box.
   // Tee up all the settings...
   lcd.setTextFont(_fontId);
-  uint16_t text_color = _focused ? invertColor(_color) : _color;
+  uint16_t text_color = isFocused(renderFlags) ? invertColor(_color) : _color;
   if (_bg_color != BG_NONE) {
-    uint16_t bg = _focused ? invertColor(_bg_color) : _bg_color;
+    uint16_t bg = isFocused(renderFlags) ? invertColor(_bg_color) : _bg_color;
     lcd.setTextColor(text_color, bg);
   } else {
     lcd.setTextColor(text_color);
@@ -83,7 +83,7 @@ int16_t FloatLabel::getContentWidth(TFT_eSPI &lcd) const {
   } else {
     // There is no textWidth() for numbers, but we know the number of digits for
     // the integer part is proportional to the base10 log of the number, and we
-    // know the max digits we plan to place after the decimal. 
+    // know the max digits we plan to place after the decimal.
     // TODO(aaron): Can we just drawFloat() someplace offscreen and use the return value of
     // that method?
     return addBorderWidth((ceil(log10(fabs(_val))) + _maxDecimalDigits + 1) * lcd.textWidth("0", _fontId));

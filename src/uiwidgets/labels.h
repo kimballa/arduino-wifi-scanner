@@ -9,7 +9,7 @@ public:
 
   // Sets up the font, color, bg, etc., and then defers to renderText() to text-ify a particular
   // piece of data on this surface with these settings.
-  virtual void render(TFT_eSPI &lcd);
+  virtual void render(TFT_eSPI &lcd, uint32_t renderFlags);
 
   // Subclasses: Implement how to draw the text representation of the label's reference data.
   virtual void renderText(TFT_eSPI &lcd) = 0;

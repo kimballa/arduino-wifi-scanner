@@ -10,11 +10,11 @@ class Heatmap : public UIWidget {
 public:
   Heatmap(): UIWidget(), _channels(), _rssiLevels(), _color(TFT_RED) { };
 
-  virtual void render(TFT_eSPI &lcd);
+  virtual void render(TFT_eSPI &lcd, uint32_t renderFlags);
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;
   virtual bool redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags=0) {
-    return widget == this ? render(lcd), true : false;
+    return widget == this ? render(lcd, renderFlags), true : false;
   };
 
   // Define a wifi channel id in the spectrum

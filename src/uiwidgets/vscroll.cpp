@@ -43,29 +43,34 @@ void VScroll::render(TFT_eSPI &lcd, uint32_t renderFlags) {
   if ((renderFlags & RF_WIDGET_SPECIFIC) == 0
       || (renderFlags & RF_VSCROLL_SCROLLBAR) == RF_VSCROLL_SCROLLBAR) {
     // We should draw the scrollbar (explicit directive, or no widget-specific guidance / draw all).
-    renderScrollbar(lcd);
+    // Border, if any, also redrawn in this directive.
+    _renderScrollbar(lcd, renderFlags);
+  }
+
+  if (isFocused(renderFlags)) {
+    // If the VScroll is focused, propagate that fact to all child elements.
+    renderFlags |= RF_FOCUSED;
   }
 
   if ((renderFlags & RF_WIDGET_SPECIFIC) == 0
       || (renderFlags & RF_VSCROLL_CONTENT) == RF_VSCROLL_CONTENT) {
     // We should draw all the content (explicit directive, or no widget-specific guidance / draw all).
-    renderContentArea(lcd);
+    _renderContentArea(lcd, renderFlags);
   } else if ((renderFlags & RF_VSCROLL_SELECTED) == RF_VSCROLL_SELECTED) {
     // We should redraw only the content area rows indicated by _selectIdx and _priorSelectIdx.
-
     // Iterate through all the visible entries and render the appropriate ones.
     for (size_t i = _topIdx; i < _lastIdx; i++) {
       if (i == _selectIdx || i == _priorSelectIdx) {
         UIWidget *pEntry = _entries[i];
         if (pEntry != NULL) {
-          pEntry->render(lcd);
+          pEntry->render(lcd, renderFlags);
         }
       }
     }
   }
 }
 
-void VScroll::renderScrollbar(TFT_eSPI &lcd) {
+void VScroll::_renderScrollbar(TFT_eSPI &lcd, uint32_t renderFlags) {
   // X position of the left-most edge of the scrollbar.
   int16_t scrollbarX = _x + _w - VSCROLL_SCROLLBAR_W;
 
@@ -75,15 +80,15 @@ void VScroll::renderScrollbar(TFT_eSPI &lcd) {
     // the scrollbar, do not include them in the fill. The areas near the top and bottom
     // containing the carets will also be filled in renderScrollUp()/renderScrollDown(), so
     // we only need to focus on the main scroll indicator.
-    uint16_t scrollbarBg = _focused ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
+    uint16_t scrollbarBg = isFocused(renderFlags) ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
     lcd.fillRect(scrollbarX + 1, _y + scrollBoxWidgetHeight + 1,
         VSCROLL_SCROLLBAR_W - 2, _h - 2 * scrollBoxWidgetHeight - 1,
         scrollbarBg);
   }
 
-  drawBorder(lcd);
+  drawBorder(lcd, renderFlags);
 
-  uint16_t scrollbarColor = _focused ? invertColor(_border_color) : _border_color;
+  uint16_t scrollbarColor = isFocused(renderFlags) ? invertColor(_border_color) : _border_color;
 
   // Vertical bars for sides of scrollbar.
   lcd.drawFastVLine(scrollbarX, _y, _h, scrollbarColor);
@@ -96,8 +101,8 @@ void VScroll::renderScrollbar(TFT_eSPI &lcd) {
 
   // Draw carets
 
-  renderScrollUp(lcd, false);
-  renderScrollDown(lcd, false);
+  renderScrollUp(lcd, false, renderFlags);
+  renderScrollDown(lcd, false, renderFlags);
 
   // Draw the scroll position indicator.
   // Use MacOS-style fixed-size box whose position is proportional to the position of the viewing
@@ -109,17 +114,17 @@ void VScroll::renderScrollbar(TFT_eSPI &lcd) {
       VSCROLL_SCROLLBAR_W, scrollBoxWidgetHeight, scrollbarColor);
 }
 
-void VScroll::renderContentArea(TFT_eSPI &lcd) {
+void VScroll::_renderContentArea(TFT_eSPI &lcd, uint32_t renderFlags) {
   // Iterate through all the visible entries and render them.
   for (size_t i = _topIdx; i < _lastIdx; i++) {
     UIWidget *pEntry = _entries[i];
     if (pEntry != NULL) {
-      pEntry->render(lcd);
+      pEntry->render(lcd, renderFlags);
     }
   }
 }
 
-void VScroll::renderScrollUp(TFT_eSPI &lcd, bool btnActive) {
+void VScroll::renderScrollUp(TFT_eSPI &lcd, bool btnActive, uint32_t renderFlags) {
   // X position of the left-most edge of the scrollbar.
   int16_t scrollbarX = _x + _w - VSCROLL_SCROLLBAR_W;
 
@@ -127,12 +132,12 @@ void VScroll::renderScrollUp(TFT_eSPI &lcd, bool btnActive) {
     // Fill in the background of the scrollbar area under the caret.
     // Since the edges will be taken up completely with the horiz and vertical borders of
     // the scrollbar, do not include them in the fill.
-    uint16_t scrollbarBg = _focused ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
+    uint16_t scrollbarBg = isFocused(renderFlags) ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
     lcd.fillRect(scrollbarX + 1, _y + 1, VSCROLL_SCROLLBAR_W - 2, scrollBoxWidgetHeight - 1,
         scrollbarBg);
   }
 
-  uint16_t scrollbarColor = _focused ? invertColor(_border_color) : _border_color;
+  uint16_t scrollbarColor = isFocused(renderFlags) ? invertColor(_border_color) : _border_color;
 
   // Upward facing ^ for scroll-up, at the top.
   if (btnActive) {
@@ -147,7 +152,8 @@ void VScroll::renderScrollUp(TFT_eSPI &lcd, bool btnActive) {
                      scrollbarColor);
   }
 }
-void VScroll::renderScrollDown(TFT_eSPI &lcd, bool btnActive) {
+
+void VScroll::renderScrollDown(TFT_eSPI &lcd, bool btnActive, uint32_t renderFlags) {
   // X position of the left-most edge of the scrollbar.
   int16_t scrollbarX = _x + _w - VSCROLL_SCROLLBAR_W;
 
@@ -155,12 +161,12 @@ void VScroll::renderScrollDown(TFT_eSPI &lcd, bool btnActive) {
     // Fill in the background of the scrollbar area under the caret.
     // Since the edges will be taken up completely with the horiz and vertical borders of
     // the scrollbar, do not include them in the fill.
-    uint16_t scrollbarBg = _focused ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
+    uint16_t scrollbarBg = isFocused(renderFlags) ? invertColor(_scrollbar_bg_color) : _scrollbar_bg_color;
     lcd.fillRect(scrollbarX + 1, _y + _h - scrollBoxWidgetHeight, VSCROLL_SCROLLBAR_W - 2,
         scrollBoxWidgetHeight - 1, scrollbarBg);
   }
 
-  uint16_t scrollbarColor = _focused ? invertColor(_border_color) : _border_color;
+  uint16_t scrollbarColor = isFocused(renderFlags) ? invertColor(_border_color) : _border_color;
 
   // Downward facing v for scroll-down, at the bottom.
   if (btnActive) {
@@ -207,7 +213,7 @@ bool VScroll::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t render
           pEntry->getRect(cx, cy, cw, ch);
           lcd.fillRect(cx, cy, cw, ch, _content_bg_color);
         }
-        pEntry->render(lcd);
+        pEntry->render(lcd, renderFlags);
         return true;
       }
     }

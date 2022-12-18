@@ -11,7 +11,7 @@ public:
   void setText(const char *str) { _btnLabel = str; };
   const char *getText() const { return _btnLabel; };
 
-  virtual void render(TFT_eSPI &lcd);
+  virtual void render(TFT_eSPI &lcd, uint32_t renderFlags);
 
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;

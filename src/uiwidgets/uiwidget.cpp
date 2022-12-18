@@ -33,14 +33,14 @@ void UIWidget::getRect(int16_t &cx, int16_t &cy, int16_t &cw, int16_t &ch) const
   ch = _h;
 }
 
-void UIWidget::drawBorder(TFT_eSPI &lcd) {
+void UIWidget::drawBorder(TFT_eSPI &lcd, uint32_t renderFlags) {
   // TODO: Implement flex-height / flex-width border.
 
   if (_border_color == TRANSPARENT_COLOR) {
     return; // Nothing to actually render; border is transparent.
   }
 
-  uint16_t border_color = _focused ? invertColor(_border_color) : _border_color;
+  uint16_t border_color = isFocused(renderFlags) ? invertColor(_border_color) : _border_color;
 
   if ((_border_flags & BORDER_ROUNDED) == BORDER_ROUNDED) {
     lcd.drawRoundRect(_x, _y, _w, _h, BORDER_ROUNDED_RADIUS, border_color);
@@ -65,20 +65,41 @@ void UIWidget::drawBorder(TFT_eSPI &lcd) {
   }
 }
 
-void UIWidget::drawBackground(TFT_eSPI &lcd) {
+void UIWidget::drawBackground(TFT_eSPI &lcd, uint32_t renderFlags) {
   // TODO: Implement flex-height / flex-width background.
 
-  if (_bg_color == TRANSPARENT_COLOR) {
-    return; // Nothing to actually render; background is transparent.
+  if (_bg_color == TRANSPARENT_COLOR || (renderFlags & RF_NO_BACKGROUNDS) == RF_NO_BACKGROUNDS) {
+    return; // Nothing to actually render; background is transparent or suppressed.
   }
 
-  uint16_t bg_color = _focused ? invertColor(_bg_color) : _bg_color;
+  uint16_t bg_color = isFocused(renderFlags) ? invertColor(_bg_color) : _bg_color;
 
   if (_border_flags & BORDER_ROUNDED) {
     lcd.fillRoundRect(_x, _y, _w, _h, BORDER_ROUNDED_RADIUS, bg_color);
   } else {
     lcd.fillRect(_x, _y, _w, _h, bg_color);
   }
+}
+
+/**
+ * Fill in the background that this widget would render underneath another widget being redrawn,
+ * without filling in the background for this entire widget's surface area.
+ */
+void UIWidget::drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags) {
+  if (NULL == widget) {
+    return;
+  }
+
+  if (_bg_color == TRANSPARENT_COLOR) {
+    return; // Nothing to draw.
+  }
+
+  if ((renderFlags & RF_NO_BACKGROUNDS) == RF_NO_BACKGROUNDS) {
+    return; // Don't draw backgrounds in this refresh process.
+  }
+
+  uint16_t bg = isFocused(renderFlags) ? invertColor(_bg_color) : _bg_color;
+  lcd.fillRect(widget->_x, widget->_y, widget->_w, widget->_h, bg);
 }
 
 void UIWidget::setPadding(int16_t padL, int16_t padR, int16_t padT, int16_t padB) {
@@ -131,7 +152,7 @@ bool UIWidget::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t rende
   if (NULL == widget) {
     return false;
   } else if (this == widget) {
-    render(lcd);
+    render(lcd, renderFlags);
     return true;
   }
 
@@ -225,25 +246,8 @@ int16_t UIWidget::addBorderHeight(int16_t contentHeight) const {
   return contentHeight;
 }
 
-/**
- * Fill in the background that this widget would render underneath another widget being redrawn.
- */
-void UIWidget::drawBackgroundUnderWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFlags) {
-  if (NULL == widget) {
-    return;
-  }
-
-  if (_bg_color == TRANSPARENT_COLOR) {
-    return; // Nothing to draw.
-  }
-
-  if ((renderFlags & RF_NO_BACKGROUNDS) == 1) {
-    return; // Don't draw backgrounds in this refresh process.
-  }
-
-  uint16_t bg = _focused ? invertColor(_bg_color) : _bg_color;
-  lcd.fillRect(widget->_x, widget->_y, widget->_w, widget->_h, bg);
+// Within a render context, focus can be because we are explicitly focused (_focused == true)
+// or because we inherit focus from a parent element via a render flag.
+bool UIWidget::isFocused(uint32_t renderFlags) const {
+  return _focused || ((renderFlags & RF_FOCUSED) == RF_FOCUSED);
 }
-
-
-

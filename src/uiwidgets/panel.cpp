@@ -3,11 +3,15 @@
 
 #include "uiwidgets.h"
 
-void Panel::render(TFT_eSPI &lcd) {
-  drawBackground(lcd);
-  drawBorder(lcd);
+void Panel::render(TFT_eSPI &lcd, uint32_t renderFlags) {
+  drawBackground(lcd, renderFlags);
+  drawBorder(lcd, renderFlags);
   if (_child != NULL) {
-    _child->render(lcd);
+    if (isFocused(renderFlags)) {
+      // If this panel is itself focused, propagate that fact to child widget.
+      renderFlags |= RF_FOCUSED;
+    }
+    _child->render(lcd, renderFlags);
   }
 }
 
@@ -45,7 +49,7 @@ bool Panel::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFl
   if (NULL == widget) {
     return false;
   } else if (widget == this) {
-    render(lcd);
+    render(lcd, renderFlags);
     return true;
   } else if (containsWidget(widget) && NULL != _child) {
     drawBackgroundUnderWidget(widget, lcd, renderFlags);

@@ -49,17 +49,21 @@ void Rows::setNumRows(uint16_t numRows) {
   cascadeBoundingBox();
 }
 
-void Rows::render(TFT_eSPI &lcd) {
-  drawBackground(lcd);
-  drawBorder(lcd);
+void Rows::render(TFT_eSPI &lcd, uint32_t renderFlags) {
+  drawBackground(lcd, renderFlags);
+  drawBorder(lcd, renderFlags);
 
   // TODO(aaron): If widgets have FLEX sizing, dynamically adjust the bounding boxes of all
   // elements before rendering each element.
 
+  if (isFocused(renderFlags)) {
+    renderFlags |= RF_FOCUSED; // propagate our focused nature to any child element(s).
+  }
+
   for (uint16_t i = 0; i < _numRows; i++) {
     UIWidget *widget = _elements[i];
     if (widget != NULL) {
-      widget->render(lcd);
+      widget->render(lcd, renderFlags);
     }
   }
 }
@@ -171,7 +175,7 @@ bool Rows::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFla
   if (NULL == widget) {
     return false;
   } else if (this == widget) {
-    render(lcd);
+    render(lcd, renderFlags);
     return true;
   } else if (containsWidget(widget)) {
     for (unsigned int i = 0; i < _numRows; i++) {
@@ -237,17 +241,21 @@ void Cols::setNumCols(uint16_t numCols) {
   cascadeBoundingBox();
 }
 
-void Cols::render(TFT_eSPI &lcd) {
-  drawBackground(lcd);
-  drawBorder(lcd);
+void Cols::render(TFT_eSPI &lcd, uint32_t renderFlags) {
+  drawBackground(lcd, renderFlags);
+  drawBorder(lcd, renderFlags);
 
   // TODO(aaron): If widgets have FLEX sizing, dynamically adjust the bounding boxes of all
   // elements before rendering each element.
 
+  if (isFocused(renderFlags)) {
+    renderFlags |= RF_FOCUSED; // propagate our focused nature to any child element(s).
+  }
+
   for (uint16_t i = 0; i < _numCols; i++) {
     UIWidget *widget = _elements[i];
     if (widget != NULL) {
-      widget->render(lcd);
+      widget->render(lcd, renderFlags);
     }
   }
 }
@@ -358,7 +366,7 @@ bool Cols::redrawChildWidget(UIWidget *widget, TFT_eSPI &lcd, uint32_t renderFla
   if (NULL == widget) {
     return false;
   } else if (this == widget) {
-    render(lcd);
+    render(lcd, renderFlags);
     return true;
   } else if (containsWidget(widget)) {
     for (unsigned int i = 0; i < _numCols; i++) {

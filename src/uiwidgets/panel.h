@@ -13,7 +13,7 @@ public:
 
   void setChild(UIWidget *widget) { _child = widget; };
 
-  virtual void render(TFT_eSPI &lcd);
+  virtual void render(TFT_eSPI &lcd, uint32_t renderFlags);
   virtual void cascadeBoundingBox();
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;
   virtual int16_t getContentHeight(TFT_eSPI &lcd) const;

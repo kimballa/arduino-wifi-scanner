@@ -2,7 +2,7 @@
 
 #include "uiwidgets.h"
 
-void UIButton::render(TFT_eSPI &lcd) {
+void UIButton::render(TFT_eSPI &lcd, uint32_t renderFlags) {
   // We explicitly ignore (clobber, actually) border and background.
   _border_flags = BORDER_NONE;
 
@@ -12,7 +12,7 @@ void UIButton::render(TFT_eSPI &lcd) {
 
   lcd.setTextFont(_fontId);
 
-  if (_focused) {
+  if (isFocused(renderFlags)) {
     lcd.fillRoundRect(childX, childY, childW, childH, BORDER_ROUNDED_RADIUS, _color);
     lcd.setTextColor(invertColor(_color));
   } else {

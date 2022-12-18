@@ -3,6 +3,16 @@
 #ifndef __UIW_SCREEN_H
 #define __UIW_SCREEN_H
 
+// Flags that can be passed to renderWidget().
+
+constexpr uint32_t RF_NONE              =     0x0;
+constexpr uint32_t RF_NO_BACKGROUNDS    =     0x1; // Ignore underlying background fields.
+constexpr uint32_t RF_FOCUSED           =     0x2; // Current element has focus even if isFocused()
+                                                   // returns false.
+
+constexpr uint32_t RF_WIDGET_SPECIFIC   =  0x1000; // Indicates widget-specific interpretations
+                                                   // for flags masked by FFFF0000.
+
 /**
  * A Screen is the top-level UIWidgets container. This is not itself a UIWidget;
  * it holds a UIWidget (likely a Panel, Rows, or Cols) to be drawn.
@@ -18,7 +28,7 @@ public:
   UIWidget *getWidget() const { return _widget; };
 
   // Render the entire screen.
-  void render();
+  void render(uint32_t renderFlags = RF_NONE);
 
   // Re-render one widget whose view is invalidated (along with any backgrounds, etc.
   // underneath it).
@@ -35,19 +45,6 @@ private:
 
   uint16_t _bgColor;
 };
-
-// Flags that can be passed to renderWidget().
-
-constexpr uint32_t RF_NONE              =     0x0;
-constexpr uint32_t RF_NO_BACKGROUNDS    =     0x1; // Ignore underlying background fields.
-
-constexpr uint32_t RF_WIDGET_SPECIFIC   =  0x1000; // Indicates widget-specific interpretations
-                                                   // for flags masked by FFFF0000.
-
-// Render flags specific to the VScroll widget.
-constexpr uint32_t RF_VSCROLL_CONTENT   = 0x10000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
-constexpr uint32_t RF_VSCROLL_SCROLLBAR = 0x20000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
-constexpr uint32_t RF_VSCROLL_SELECTED  = 0x40000 | RF_WIDGET_SPECIFIC | RF_NO_BACKGROUNDS;
 
 
 

@@ -63,7 +63,7 @@ public:
   bool setSelection(size_t idx); // specify the idx of an elem to select.
   bool selectUp(); // select the element 1 above the current one.
   bool selectDown(); // select the element 1 lower than the current one.
-  size_t selectId() const { return _selectIdx; }; // return idx of selected element.
+  size_t selectIdx() const { return _selectIdx; }; // return idx of selected element.
   UIWidget* getSelected() const; // Return the selected elem (or NULL if none).
 
   // Specify height available to each entry to render within.

@@ -193,7 +193,14 @@ static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
   }
 
   // Button released; perform action.
-  bool scrollOK = wifiListScroll.scrollUp();
+  bool scrollOK = false;
+  if (wifiListScroll.selectIdx() == wifiListScroll.position()) {
+    // Current selection is at the top of the window, so we need to scroll the window
+    // up by one element as we also move the selection up.
+    scrollOK = wifiListScroll.scrollUp();
+  }
+
+  // In all cases, move the selection up by 1 element.
   bool selectOK = wifiListScroll.selectUp();
 
   uint32_t flags = 0;
@@ -224,7 +231,15 @@ static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
   }
 
   // Button released; perform action.
-  bool scrollOK = wifiListScroll.scrollDown();
+  bool scrollOK = false;
+  if (wifiListScroll.selectIdx() == wifiListScroll.bottomIdx() - 1) {
+    // We've already moved the cursor to the last line of the visible page and need to
+    // keep moving down. We need to both scroll down the VScroll page and select the
+    // subsequent item.
+    scrollOK = wifiListScroll.scrollDown();
+  }
+
+  // In all cases, move the selection down by one element.
   bool selectOK = wifiListScroll.selectDown();
 
   uint32_t flags = 0;

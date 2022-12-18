@@ -8,8 +8,6 @@
   * Radio button ?
 
 * SELECT AND SCROLL:
-  * scroll down/up only after we've moved the selection cursor all the way to the bottom/top of the
-    VScroll window.
   * cascade focus nature thru render hierarchy. Labels within a selected Cols need to know they're
     in focus to properly invert fonts. (Probably w/ a render flag? Requires all render()
     to accept and cascade renderFlags.)

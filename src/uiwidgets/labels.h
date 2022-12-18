@@ -29,10 +29,12 @@ protected:
 class StrLabel: public Label {
 public:
   StrLabel(const char *text=NULL): Label(), _str(text) { };
+  StrLabel(const String &text): Label(), _str(text.c_str()) { };
 
   virtual void renderText(TFT_eSPI &lcd);
 
   void setText(const char *str) { _str = str; };
+  void setText(const String &str) { _str = str.c_str(); };
   const char* getText() const { return _str; };
 
   virtual int16_t getContentWidth(TFT_eSPI &lcd) const;

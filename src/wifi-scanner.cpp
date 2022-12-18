@@ -6,6 +6,7 @@
 
 
 static void scanWifi();
+static void showStationDetails(size_t wifiIdx);
 
 TFT_eSPI lcd;
 
@@ -15,7 +16,7 @@ static constexpr int16_t RSSI_WIDTH = 30;
 static constexpr int16_t BSSID_WIDTH = 80;
 
 Screen screen(lcd);
-// The screen is a set of rows: row of buttons, then the main vscroll.
+// The screen is a set of rows: row of buttons, then the main vscroll (or heatmap or details).
 static Rows rowLayout(4); // 3 rows.
 // the top row (#0) is a set of buttons.
 static Cols topRow(4); // 4 columns
@@ -38,18 +39,82 @@ static StrLabel hdrRssi = StrLabel(hdrRssiStr);
 static StrLabel hdrBssid = StrLabel(hdrBssidStr);
 static Cols dataHeaderRow(4); // 4 columns.
 
-// Row 2: The main focus of the screen is a scrollable list of wifi SSIDs.
+// Row 2: The main focus of the screen:
+// * Starts as a VScroll list of wifi SSIDs.
+// * May also be a Panel with details for the selected SSID.
+// * May also be a Heatmap with viz of current wifi band congestion.
 static VScroll wifiListScroll;
 static Panel wifiScrollContainer; // Wrap VScroll in a container for padding.
 
 static Heatmap wifi24GHzHeatmap; // Heatmap of congestion on 2.4 GHz channels
 static Heatmap wifi50GHzHeatmap; // Heatmap of congestion on 5 GHz channels
 
-// Enumerate all the possible main-area content panels.
+static Panel detailsPanel;
+/**
+ * Details panel contains detailsRows, which has the following layout
+ *
+ * 0 StationInfoCols:: ChanHdr:  Chan  (empty) RssiHdr: Rssi
+ * 1 SsidCols::        SsidHdr:  SSID
+ * 2 BssidCols::       BssidHdr: BSSID
+ * 3 ModeBwCols::      Modes (empty) Bandwidth
+ * 4 SecurityCols::    SecurityHdr: Security
+ * 5 (empty row; EQUAL space to bottom-justify detailsHeatmap)
+ * 6 (HeatmapHdr)
+ * 7 (detailsHeatmap)
+ */
+static StrLabel detailsChanHdr(hdrChannelStr);
+static IntLabel detailsChan;
+static StrLabel detailsRssiHdr(hdrRssiStr);
+static IntLabel detailsRssi;
+
+static StrLabel detailsSsidHdr(hdrSsidStr);
+static StrLabel detailsSsid; // holds actual SSID of selected station.
+
+static StrLabel detailsBssidHdr(hdrBssidStr);
+static StrLabel detailsBssid; // holds actual BSSID str of selected station.
+
+static constexpr size_t MODES_TEXT_LEN = 16;
+static char detailsModesText[MODES_TEXT_LEN]; // Long enough for "802.11: b, g, n"
+static StrLabel detailsModes(detailsModesText); // holds 'b/g/n' flags.
+static constexpr size_t BANDWIDTH_TEXT_LEN = 8;
+static char detailsBandwidthText[BANDWIDTH_TEXT_LEN]; // Long enough for "20 MHz"
+static StrLabel detailsBandwidth(detailsBandwidthText); // holds 20/40 MHz indicator.
+
+static const char hdrDetailsSecurityStr[] = "Security:";
+static StrLabel detailsSecurityHdr(hdrDetailsSecurityStr);
+static const char SECURITY_OPEN[] = "Open";
+static const char SECURITY_WEP[] = "WEP";
+static const char SECURITY_WPA_PSK[] = "WPA PSK-Personal";
+static const char SECURITY_WPA2_PSK[] = "WPA2 PSK-Personal";
+static const char SECURITY_WPA_WPA2_PSK[] = "WPA/WPA2 PSK-Personal";
+static const char SECURITY_WPA2_ENTERPRISE[] = "WPA2-Enterprise";
+static const char SECURITY_UNKNOWN[] = "(Unknown)";
+static StrLabel detailsSecurity(SECURITY_UNKNOWN);
+
+static const char hdrDetailsHeatmapStr[] = "Channel spectrum interference:";
+static StrLabel detailsHeatmapHdr(hdrDetailsHeatmapStr);
+
+static const char backStr[] = "Back"; // Button text to go back to the VScroll.
+static const char disableStr[] = "Disable"; // Button text to disable this SSID in heatmap analysis.
+static const char enableStr[] = "Enable"; // Button text to enable this SSID in heatmap analysis.
+static UIButton detailsBackBtn(backStr);
+static UIButton detailsDisableBtn(disableStr);
+static Heatmap detailsHeatmap;
+static Rows detailsRows(8);
+static Cols detailsStationInfoCols(5);
+static Cols detailsSsidCols(2);
+static Cols detailsBssidCols(2);
+static Cols detailsModeBwCols(3);
+static Cols detailsSecurityCols(2);
+
+
+// Enumerate all main-area content panels the user can cycle through.
 constexpr unsigned int ContentCarousel_SignalList = 0;  // Show a list of wifi SSIDs
 constexpr unsigned int ContentCarousel_Heatmap24 = 1;   // Show a heatmap of 2.4 GHz channel usage
 constexpr unsigned int ContentCarousel_Heatmap50 = 2;   // Show a heatmap of 5 GHz channel usage
 constexpr unsigned int MaxContentCarousel = ContentCarousel_Heatmap50;
+// (Note that detailsPanel isn't accessed through the 'cycle carousel' button, it's activated
+// by pressing the 5-way hat "in" button on a selectable line of the VScroll.)
 
 static unsigned int carouselPos = ContentCarousel_SignalList;
 
@@ -64,8 +129,8 @@ static tc::vector<Button> buttons;
 static tc::vector<uint8_t> buttonGpioPins;
 
 // Arrays that define the channel numbers in each frequency range (US FCC band plan).
-static constexpr unsigned int wifi24GHzChannelPlan[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
-static constexpr unsigned int wifi50GHzChannelPlan[] = {
+static constexpr tc::const_array<int> wifi24GHzChannelPlan = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+static constexpr tc::const_array<int> wifi50GHzChannelPlan = {
   32, 36, 40, 44, 48,        // U-NII-1 channels, unrestricted
   // 52, 56, 60, 64, 68, 96, // U-NII-1 and 2A, use DFS or below 500mW
   // 100, 104, 108, 112,
@@ -185,6 +250,20 @@ void setStatusLine(const char *in, bool immediateRedraw) {
   }
 }
 
+// 5-way hat "in" -- show details for current station.
+static void stationDetailsHandler(uint8_t btnId, uint8_t btnState) {
+  if (btnState == BTN_PRESSED) {
+    detailsButton.setFocus(true);
+    screen.renderWidget(&detailsButton);
+    return;
+  }
+
+  // button released; defocus button and do action.
+  detailsButton.setFocus(false);
+  screen.renderWidget(&detailsButton);
+  showStationDetails(wifiListScroll.selectIdx());
+}
+
 // 5-way hat "up" -- scroll up the list.
 static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
   if (btnState == BTN_PRESSED) {
@@ -276,6 +355,12 @@ static void toggleHeatmapButtonHandler(uint8_t btnId, uint8_t btnState) {
   screen.render(); // Redraw entire screen.
 }
 
+void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<int> &channelPlan) {
+  for (auto channel: channelPlan) {
+    heatmap->defineChannel(channel);
+  }
+}
+
 void setup() {
   DBGSETUP();
   //while (!Serial) { delay(10); }
@@ -295,27 +380,28 @@ void setup() {
     pinMode(pin, INPUT_PULLUP);
   }
 
-  buttons.push_back(Button(0, scrollUpHandler));
-  buttons.push_back(Button(1, scrollDownHandler));
-  buttons.push_back(Button(2, emptyBtnHandler));
-  buttons.push_back(Button(3, emptyBtnHandler));
-  buttons.push_back(Button(4, emptyBtnHandler));
-  buttons.push_back(Button(5, emptyBtnHandler));
-  buttons.push_back(Button(6, emptyBtnHandler));
-  buttons.push_back(Button(7, toggleHeatmapButtonHandler));
+  buttons.push_back(Button(0, scrollUpHandler));    // hat up
+  buttons.push_back(Button(1, scrollDownHandler));  // hat down
+  buttons.push_back(Button(2, emptyBtnHandler)); // hat left
+  buttons.push_back(Button(3, emptyBtnHandler)); // hat right
+  buttons.push_back(Button(4, stationDetailsHandler)); // hat "in"/"OK"
+  buttons.push_back(Button(5, stationDetailsHandler)); // top left "details" button
+  buttons.push_back(Button(6, emptyBtnHandler)); // top middle "refresh" button
+  buttons.push_back(Button(7, toggleHeatmapButtonHandler)); // top right "heatmap" button.
 
   lcd.begin();
   lcd.setRotation(3);
   lcd.fillScreen(TFT_BLACK);
   lcd.setTextFont(2); // 0 for 8px, 2 for 16px.
   lcd.setTextColor(TFT_WHITE);
-  lcd.drawString("Wifi analyzer starting up...", 0, 0);
+  lcd.drawString("Wifi analyzer starting up...", 4, 4);
 
   // Set WiFi to station mode and disconnect from an AP if it was previously connected
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
 
+  // Set up main layout, with nav buttons, status, etc. and the station list vscroll.
   screen.setBackground(TRANSPARENT_COLOR);
   screen.setWidget(&rowLayout);
   rowLayout.setRow(0, &topRow, 30);
@@ -337,7 +423,6 @@ void setup() {
 
   detailsButton.setColor(TFT_BLUE);
   detailsButton.setPadding(4, 4, 0, 0);
-  detailsButton.setFocus(true);
 
   rescanButton.setColor(TFT_BLUE);
   rescanButton.setPadding(4, 4, 0, 0);
@@ -370,16 +455,67 @@ void setup() {
   statusLineLabel.setBackground(TFT_BLUE);
   statusLineLabel.setPadding(2, 0, 3, 0);
 
-  // Set up channel plans in heatmaps.
-  for (auto channel: wifi24GHzChannelPlan) {
-    wifi24GHzHeatmap.defineChannel(channel);
-  }
+  // Set up Details page UI widgets.
+  detailsPanel.setChild(&detailsRows);
+  detailsPanel.setBackground(TFT_NAVY);
+  detailsPanel.setPadding(4, 4, 4, 4);
+  detailsRows.setRow(0, &detailsStationInfoCols, 24);
+  detailsRows.setRow(1, &detailsSsidCols, 24);
+  detailsRows.setRow(2, &detailsBssidCols, 24);
+  detailsRows.setRow(3, &detailsModeBwCols, 24);
+  detailsRows.setRow(4, &detailsSecurityCols, 24);
+  detailsRows.setRow(5, NULL, EQUAL); // Empty row: Fill available space.
+  detailsRows.setRow(6, &detailsHeatmapHdr, 16); // Entire row is header label for heatmap.
+  detailsRows.setRow(7, &detailsHeatmap, 32); // Entire bottom row is spectrum heatmap
 
-  for (auto channel: wifi50GHzChannelPlan) {
-    wifi50GHzHeatmap.defineChannel(channel);
-  }
+  detailsStationInfoCols.setColumn(0, &detailsChanHdr, 40);
+  detailsStationInfoCols.setColumn(1, &detailsChan, 40);
+  detailsStationInfoCols.setColumn(2, NULL, EQUAL);
+  detailsStationInfoCols.setColumn(3, &detailsRssiHdr, 40);
+  detailsStationInfoCols.setColumn(4, &detailsRssi, 40);
+  detailsStationInfoCols.setBorder(BORDER_BOTTOM);
+  detailsChanHdr.setColor(TFT_YELLOW);
+  detailsChanHdr.setFont(2); // larger font size for channel id.
+  detailsRssiHdr.setColor(TFT_YELLOW);
+  detailsRssiHdr.setFont(0);
+  detailsChan.setFont(2);
+  detailsRssi.setFont(0);
 
-  scanWifi(); // Populates VScroll and heatmap elements.
+  detailsSsidCols.setColumn(0, &detailsSsidHdr, 40);
+  detailsSsidCols.setColumn(1, &detailsSsid, EQUAL);
+  detailsSsidHdr.setColor(TFT_YELLOW);
+  detailsSsidHdr.setFont(2); // larger font size for SSID.
+  detailsSsid.setFont(2);
+
+  detailsBssidCols.setColumn(0, &detailsBssidHdr, 40);
+  detailsBssidCols.setColumn(1, &detailsBssid, EQUAL);
+  detailsBssidHdr.setColor(TFT_YELLOW);
+  detailsBssidHdr.setFont(2); // larger font size for BSSID.
+  detailsBssid.setFont(2);
+
+  detailsModeBwCols.setColumn(0, &detailsModes, EQUAL);
+  detailsModeBwCols.setColumn(1, &detailsBandwidth, EQUAL);
+  detailsModes.setColor(TFT_YELLOW);
+  detailsModes.setFont(0);
+  detailsBandwidth.setColor(TFT_YELLOW);
+  detailsBandwidth.setFont(0);
+
+  detailsSecurityCols.setColumn(0, &detailsSecurityHdr, 60);
+  detailsSecurityCols.setColumn(1, &detailsSecurity, EQUAL);
+  detailsSecurityHdr.setColor(TFT_YELLOW);
+  detailsSecurityHdr.setFont(2);
+  detailsSecurity.setFont(2);
+
+  detailsHeatmapHdr.setColor(TFT_YELLOW);
+  detailsHeatmapHdr.setFont(0);
+
+  detailsHeatmap.setColor(TFT_WHITE);
+
+  // Set up channel plans for global heatmaps.
+  populateHeatmapChannelPlan(&wifi24GHzHeatmap, wifi24GHzChannelPlan);
+  populateHeatmapChannelPlan(&wifi50GHzHeatmap, wifi50GHzChannelPlan);
+
+  scanWifi(); // Populates VScroll and global heatmap elements.
   lcd.fillScreen(TFT_BLACK); // Clear 'loading' screen msg.
   screen.render();
 
@@ -393,13 +529,10 @@ static String bssids[SCAN_MAX_NUMBER];
 static StrLabel* bssidLabels[SCAN_MAX_NUMBER];
 static Cols* wifiRows[SCAN_MAX_NUMBER]; // Each row is a Cols for (ssid, chan, rssi, bssid)
 
-static void recordSignalHeatmap(int wifiIdx, const wifi_ap_record_t *pWifiAPRecord) {
-  // Now that we have channel & RSSI, register this on the appropriate heatmap.
+// Register a channel's bandwidth usage on an appropriate heatmap.
+static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *bandHeatmap) {
   int channelNum = pWifiAPRecord->primary;
   int rssiVal = pWifiAPRecord->rssi;
-
-  // Get the appropriate heatmap (2.4 GHz or 5 GHz) based on the channel id.
-  Heatmap *bandHeatmap = getHeatmapForChannel(channelNum);
 
   // Record the rssi of this ssid on its primary channel in the heatmap.
   bandHeatmap->addSignal(channelNum, rssiVal);
@@ -407,7 +540,7 @@ static void recordSignalHeatmap(int wifiIdx, const wifi_ap_record_t *pWifiAPReco
   bool is24GHz = channelNum <= max24GHzChannelNum;
   tc::vector<int> *pSpectralMask = NULL;
 
-  // Determine which protocol(s) are active and load the appropriate cross-channel interference data.
+  // Determine which mode(s) are active and load the appropriate cross-channel interference data.
   if (pWifiAPRecord->phy_11b) {
     // We are on 2.4 GHz 802.11b. (g or n may also be enabled, but the mask for 802.11b is
     // more punishing to nearby channels, so apply this one to the interference chart.)
@@ -458,6 +591,93 @@ static void recordSignalHeatmap(int wifiIdx, const wifi_ap_record_t *pWifiAPReco
   }
 }
 
+/**
+ * Flip to the Details page for a particular wifi station.
+ */
+static void showStationDetails(size_t wifiIdx) {
+  const wifi_ap_record_t *pWifiAPRecord =
+      reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(wifiIdx));
+
+  detailsChan.setValue(pWifiAPRecord->primary);
+  detailsRssi.setValue(pWifiAPRecord->rssi);
+  detailsSsid.setText(reinterpret_cast<const char*>(&(pWifiAPRecord->ssid[0])));
+  detailsBssid.setText(bssids[wifiIdx]);
+
+  // Reformat char buffer that underwrites detailsBandwidth StrLabel.
+  memset(detailsBandwidthText, 0, BANDWIDTH_TEXT_LEN);
+  if (pWifiAPRecord->second == wifi_second_chan_t::WIFI_SECOND_CHAN_NONE) {
+    strncpy(detailsBandwidthText, "20 MHz", BANDWIDTH_TEXT_LEN);
+  } else {
+    strncpy(detailsBandwidthText, "40 MHz", BANDWIDTH_TEXT_LEN);
+  }
+
+  // Reformat char buffer that underwrites detailsModes StrLabel.
+  // Construct the string '802.11: [b][, g][, n]' depending on which modes are active.
+  memset(detailsModesText, 0, MODES_TEXT_LEN);
+  strncpy(detailsModesText, "802.11: ", MODES_TEXT_LEN);
+  int numModes = 0;
+  if (pWifiAPRecord->phy_11b) {
+    strcat(detailsModesText, "b");
+    numModes++;
+  }
+
+  if (pWifiAPRecord->phy_11g) {
+    if (numModes) {
+      strcat(detailsModesText, ", ");
+    }
+    strcat(detailsModesText, "g");
+    numModes++;
+  }
+
+  if (pWifiAPRecord->phy_11n) {
+    if (numModes) {
+      strcat(detailsModesText, ", ");
+    }
+    strcat(detailsModesText, "n");
+    numModes++;
+  }
+
+  switch(pWifiAPRecord->authmode) {
+  case wifi_auth_mode_t::WIFI_AUTH_OPEN:
+    detailsSecurity.setText(SECURITY_OPEN);
+    break;
+  case wifi_auth_mode_t::WIFI_AUTH_WEP:
+    detailsSecurity.setText(SECURITY_WEP);
+    break;
+  case wifi_auth_mode_t::WIFI_AUTH_WPA_PSK:
+    detailsSecurity.setText(SECURITY_WPA_PSK);
+    break;
+  case wifi_auth_mode_t::WIFI_AUTH_WPA2_PSK:
+    detailsSecurity.setText(SECURITY_WPA2_PSK);
+    break;
+  case wifi_auth_mode_t::WIFI_AUTH_WPA_WPA2_PSK:
+    detailsSecurity.setText(SECURITY_WPA_WPA2_PSK);
+    break;
+  case wifi_auth_mode_t::WIFI_AUTH_WPA2_ENTERPRISE:
+    detailsSecurity.setText(SECURITY_WPA2_ENTERPRISE);
+    break;
+  default:
+    detailsSecurity.setText(SECURITY_UNKNOWN);
+    break;
+  }
+
+  // Fill out a heatmap for this station only.
+  detailsHeatmap.clear();
+  if (pWifiAPRecord->primary <= max24GHzChannelNum) {
+    // Populate the heatmap channel spectrum from the 2.4 GHz channel list
+    populateHeatmapChannelPlan(&detailsHeatmap, wifi24GHzChannelPlan);
+  } else {
+    // Populate the heatmap channel spectrum from the 5 GHz channel list
+    populateHeatmapChannelPlan(&detailsHeatmap, wifi50GHzChannelPlan);
+  }
+  recordSignalHeatmap(pWifiAPRecord, &detailsHeatmap);
+
+  // We've filled out all the new data. Present it to the user.
+  rowLayout.setRow(1, NULL, 0); // Hide VScroll header row, if any.
+  rowLayout.setRow(2, &detailsPanel, EQUAL); // Show the detailsPanel; use all vertical space.
+  screen.renderWidget(&rowLayout);
+}
+
 static void makeWifiRow(int wifiIdx) {
   const wifi_ap_record_t *pWifiAPRecord =
       reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(wifiIdx));
@@ -476,7 +696,7 @@ static void makeWifiRow(int wifiIdx) {
   rssiLabels[wifiIdx] = rssi;
 
   bssids[wifiIdx] = String(WiFi.BSSIDstr(wifiIdx)); // Formats 6-octet BSSID to hex str.
-  StrLabel *bssid = new StrLabel(bssids[wifiIdx].c_str());
+  StrLabel *bssid = new StrLabel(bssids[wifiIdx]);
   bssid->setPadding(0, 0, 4, 0);
   bssidLabels[wifiIdx] = bssid;
 
@@ -495,8 +715,10 @@ static void makeWifiRow(int wifiIdx) {
   wifiRows[wifiIdx] = wifiRow;
   wifiListScroll.add(wifiRow);
 
-  // Also add this wifi signal to the appropriate heatmap.
-  recordSignalHeatmap(wifiIdx, pWifiAPRecord);
+  // Get the appropriate heatmap (2.4 GHz or 5 GHz) based on the channel id.
+  Heatmap *bandHeatmap = getHeatmapForChannel(channelNum);
+  // Add this wifi signal to the appropriate heatmap.
+  recordSignalHeatmap(pWifiAPRecord, bandHeatmap);
 }
 
 

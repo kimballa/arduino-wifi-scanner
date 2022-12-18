@@ -31,6 +31,12 @@
   * See 1d heatmap of channel interference
   * Btn to remove ssid from heatmaps
 
+  * Change top row buttons when in details state.
+
+* hat up/down should only show caret animation when in main vscroll
+* hat up/down should only work in main vscroll or in details page.
+
+* Make "Refresh" button work.
 * Move BSSID out from main list and show b/g/n indicators?
 
 * Pull out UIWidgets into a separate library.

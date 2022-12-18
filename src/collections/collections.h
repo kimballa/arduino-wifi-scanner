@@ -11,6 +11,7 @@ namespace tc {
 
   constexpr size_t initial_vector_capacity = 8;
 
+  // A mutable, resizeable array-like collection of potentially-mutable items.
   template<typename T> class vector {
   public:
     vector(): _count(0), _capacity(initial_vector_capacity) {
@@ -213,9 +214,62 @@ namespace tc {
     size_t _count; // number of filled slots.
     size_t _capacity; // number of slots available.
     T* _data;
-  };
+  }; // class vector<T>
 
-}
+
+  // A wrapper around a statically-defined array of const items, of known size.
+  // This wrapper does not manage the data elements nor will it deallocate them when it goes out of
+  // scope.
+  template<typename T> class const_array {
+  public:
+    constexpr const_array(): _count(0), _data(NULL) { };
+
+    /** Copy constructor. */
+    constexpr const_array(const const_array<T> &other): _count(other._count), _data(other._data) {};
+
+    /** Copy constructor from explicit array. */
+    template<size_t N> constexpr const_array(const T (&arr)[N]): _count(N), _data(arr) {};
+
+    /** Copy constructor from brace-initialized list. */
+    constexpr const_array(std::initializer_list<T> lst): _count(lst.size()), _data(lst.begin()) { };
+
+    /** Move constructor. */
+    constexpr const_array(const_array<T> &&other) noexcept: _count(other._count), _data(other._data) {};
+
+    // No copy operator; array components are fixed.
+    const_array<T> &operator=(const_array<T> &move_src) = delete;
+
+    // No move operator; array components are fixed.
+    const_array<T> &operator=(const_array<T> &&move_src) = delete;
+
+    const T& operator[](size_t idx) const {
+      return _data[idx];
+    };
+
+    size_t size() const { return _count; }; // number of valid elements.
+    size_t capacity() const { return _count; }; // number of memory slots provisioned in array.
+    bool empty() const { return _count == 0; };
+
+    /** Return true if you can use this subscript index safely. */
+    bool in_range(size_t idx) const {
+      return idx >= 0 && idx < _count;
+    };
+
+    // C++ iterator interface.
+    const T* begin() const {
+      return &(_data[0]);
+    };
+
+    const T* end() const {
+      return &(_data[_count]);
+    };
+
+  private:
+    size_t _count; // number of filled slots.
+    const T *const _data; // ptr to immutable data.
+  }; // class const_array<T>
+
+}; // namespace tc
 
 
 #endif // _TINY_COLLECTIONS_H_

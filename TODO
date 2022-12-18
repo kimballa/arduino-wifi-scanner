@@ -24,19 +24,14 @@
     3             +/-15 MHz      -30 dBm (x1/512 W pwr)
     4             +/-20 Mhz      -50 dBm (Non-interfering)
 
-* Main UI: Select a wifi channel > See a detail page.
-  * Show SSID, BSSID, channel(s), freq.
-  * See channel width (20/40 MHz)
-  * See protocols (b/g/n) enabled
-  * See 1d heatmap of channel interference
-  * Btn to remove ssid from heatmaps
-
+* Detail page: Btn to remove ssid from heatmaps
   * Change top row buttons when in details state.
+  * Remove 'refresh', 'heatmap' buttons
+  * Add 'enable'/'disable'
 
-* hat up/down should only show caret animation when in main vscroll
-* hat up/down should only work in main vscroll or in details page.
+* Heatmap pages should hide all the top buttons except for 'Heatmap'/'Next'.
+  * On transition into a heatmap, change the heatmap button's str to 'Next'.
 
 * Make "Refresh" button work.
-* Move BSSID out from main list and show b/g/n indicators?
 
 * Pull out UIWidgets into a separate library.

@@ -7,6 +7,7 @@
 
 static void scanWifi();
 static void showStationDetails(size_t wifiIdx);
+static void stationDetailsHandler(uint8_t btnId, uint8_t btnState);
 
 TFT_eSPI lcd;
 
@@ -113,8 +114,10 @@ constexpr unsigned int ContentCarousel_SignalList = 0;  // Show a list of wifi S
 constexpr unsigned int ContentCarousel_Heatmap24 = 1;   // Show a heatmap of 2.4 GHz channel usage
 constexpr unsigned int ContentCarousel_Heatmap50 = 2;   // Show a heatmap of 5 GHz channel usage
 constexpr unsigned int MaxContentCarousel = ContentCarousel_Heatmap50;
+constexpr unsigned int ContentCarousel_Details = 3; // Show details of a given ssid.
 // (Note that detailsPanel isn't accessed through the 'cycle carousel' button, it's activated
-// by pressing the 5-way hat "in" button on a selectable line of the VScroll.)
+// by pressing the 5-way hat "in" button on a selectable line of the VScroll. Thus, MaxCC is
+// one below that.)
 
 static unsigned int carouselPos = ContentCarousel_SignalList;
 
@@ -201,6 +204,27 @@ static Heatmap *getHeatmapForChannel(int chan) {
   }
 }
 
+// The debouncer id for 5-way hat "IN" / "OK"
+static constexpr uint8_t HAT_IN_DEBOUNCE_ID = 4;
+// The debouncer id for WIO_KEY_C (left-most button on top).
+static constexpr uint8_t TOP_BUTTON_1_DEBOUNCE_ID = 5;
+
+// Set the button to display in the upper left (Either "Details" or "Back"), and assign
+// the appropriate physical button handler function for it.
+void setButton1(UIButton *uiButton, buttonHandler_t handlerFn) {
+  buttons[TOP_BUTTON_1_DEBOUNCE_ID].setHandler(handlerFn);
+  topRow.setColumn(0, uiButton, 70);
+}
+
+// Set the main display area content to be the station list.
+void displayStationList() {
+  rowLayout.setRow(1, &dataHeaderRow, 16);          // Enable header row.
+  rowLayout.setRow(2, &wifiScrollContainer, EQUAL); // VScroll expands to fill available space.
+  setStatusLine("Scan complete.", false);
+  setButton1(&detailsButton, stationDetailsHandler);
+  buttons[HAT_IN_DEBOUNCE_ID].setHandler(stationDetailsHandler); // hat-in enabled.
+  carouselPos = ContentCarousel_SignalList;
+}
 
 // Adjust the main display area content
 void rotateContentCarousel() {
@@ -211,10 +235,7 @@ void rotateContentCarousel() {
 
   switch (carouselPos) {
   case ContentCarousel_SignalList:
-    // TODO(aaron): Note code clone of these 2 rows in setup().
-    rowLayout.setRow(1, &dataHeaderRow, 16);          // Add back header row.
-    rowLayout.setRow(2, &wifiScrollContainer, EQUAL); // VScroll expands to fill available space.
-    setStatusLine("Scan complete.");
+    displayStationList();
     break;
   case ContentCarousel_Heatmap24:
     rowLayout.setRow(1, NULL, 0); // Blank out header row above vscroll.
@@ -227,9 +248,9 @@ void rotateContentCarousel() {
     setStatusLine("5 GHz spectrum congestion");
     break;
   default:
-    // ??? How'd we get here? Conform the data so it rotates back to the signal list.
-    carouselPos = MaxContentCarousel;
-    rotateContentCarousel();
+    // We are not in the ring carousel of pages so cannot go to the 'next' one. Probably
+    // because we are on the details page. Go back to the main station list.
+    displayStationList();
     break;
   }
 }
@@ -264,10 +285,35 @@ static void stationDetailsHandler(uint8_t btnId, uint8_t btnState) {
   showStationDetails(wifiListScroll.selectIdx());
 }
 
+// Clicking the 'back' button in Station Details goes back to the station list.
+static void backToStationListHandler(uint8_t btnId, uint8_t btnState) {
+  if (btnState == BTN_PRESSED) {
+    detailsBackBtn.setFocus(true);
+    screen.renderWidget(&detailsBackBtn);
+    return;
+  }
+
+  // button released; defocus button and do action.
+  detailsBackBtn.setFocus(false);
+  screen.renderWidget(&detailsBackBtn);
+  // Go back to the main signal list.
+  // Replace this UI button and handler fn with the 'Details' button that moves in the other
+  // direction.
+  displayStationList();
+  screen.render(); // Redraw entire screen.
+}
+
 // 5-way hat "up" -- scroll up the list.
 static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
+  if (carouselPos != ContentCarousel_SignalList && carouselPos != ContentCarousel_Details) {
+    // We are not in one of the screens where we can scroll at all; just ignore this button.
+    return;
+  }
+
   if (btnState == BTN_PRESSED) {
-    wifiListScroll.renderScrollUp(lcd, true);
+    if (carouselPos == ContentCarousel_SignalList) {
+      wifiListScroll.renderScrollUp(lcd, true);
+    }
     return;
   }
 
@@ -282,30 +328,43 @@ static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
   // In all cases, move the selection up by 1 element.
   bool selectOK = wifiListScroll.selectUp();
 
-  uint32_t flags = 0;
-  if (scrollOK) {
-    flags |= RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT;
-  }
+  if (carouselPos == ContentCarousel_SignalList) {
+    // Only re-render if we're in the signal list vscroll.
+    uint32_t flags = 0;
+    if (scrollOK) {
+      flags |= RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT;
+    }
 
-  if (selectOK) {
-    flags |= RF_VSCROLL_SELECTED;
-  }
+    if (selectOK) {
+      flags |= RF_VSCROLL_SELECTED;
+    }
 
-  if (!scrollOK) {
-    // Cannot scroll further up. Only redraw the up-caret to finish the animation.
-    wifiListScroll.renderScrollUp(lcd, false);
-  }
+    if (!scrollOK) {
+      // Cannot scroll further up. Only redraw the up-caret to finish the animation.
+      wifiListScroll.renderScrollUp(lcd, false);
+    }
 
-  if (flags) {
-    // Some portion of the widget broader than the scrollbar arrow needs redrawing.
-    screen.renderWidget(&wifiListScroll, flags);
+    if (flags) {
+      // Some portion of the widget broader than the scrollbar arrow needs redrawing.
+      screen.renderWidget(&wifiListScroll, flags);
+    }
+  } else if (carouselPos == ContentCarousel_Details) {
+    // Just flip to the previous 'page' of details.
+    showStationDetails(wifiListScroll.selectIdx());
   }
 }
 
 // 5-way hat "down" -- scroll down the list.
 static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
+  if (carouselPos != ContentCarousel_SignalList && carouselPos != ContentCarousel_Details) {
+    // We are not in one of the screens where we can scroll at all; just ignore this button.
+    return;
+  }
+
   if (btnState == BTN_PRESSED) {
-    wifiListScroll.renderScrollDown(lcd, true);
+    if (carouselPos == ContentCarousel_SignalList) {
+      wifiListScroll.renderScrollDown(lcd, true);
+    }
     return;
   }
 
@@ -321,23 +380,29 @@ static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
   // In all cases, move the selection down by one element.
   bool selectOK = wifiListScroll.selectDown();
 
-  uint32_t flags = 0;
-  if (scrollOK) {
-    flags |= RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT;
-  }
+  if (carouselPos == ContentCarousel_SignalList) {
+    // Only re-render scrollbox if the station list is displayed.
+    uint32_t flags = 0;
+    if (scrollOK) {
+      flags |= RF_VSCROLL_SCROLLBAR | RF_VSCROLL_CONTENT;
+    }
 
-  if (selectOK) {
-    flags |= RF_VSCROLL_SELECTED;
-  }
+    if (selectOK) {
+      flags |= RF_VSCROLL_SELECTED;
+    }
 
-  if (!scrollOK) {
-    // Cannot scroll further up. Only redraw the down-caret to finish the animation.
-    wifiListScroll.renderScrollDown(lcd, false);
-  }
+    if (!scrollOK) {
+      // Cannot scroll further up. Only redraw the down-caret to finish the animation.
+      wifiListScroll.renderScrollDown(lcd, false);
+    }
 
-  if (flags) {
-    // Some portion of the widget broader than the scrollbar arrow needs redrawing.
-    screen.renderWidget(&wifiListScroll, flags);
+    if (flags) {
+      // Some portion of the widget broader than the scrollbar arrow needs redrawing.
+      screen.renderWidget(&wifiListScroll, flags);
+    }
+  } else if (carouselPos == ContentCarousel_Details) {
+    // Just flip to the next 'page' of details.
+    showStationDetails(wifiListScroll.selectIdx());
   }
 }
 
@@ -384,8 +449,8 @@ void setup() {
   buttons.push_back(Button(1, scrollDownHandler));  // hat down
   buttons.push_back(Button(2, emptyBtnHandler)); // hat left
   buttons.push_back(Button(3, emptyBtnHandler)); // hat right
-  buttons.push_back(Button(4, stationDetailsHandler)); // hat "in"/"OK"
-  buttons.push_back(Button(5, stationDetailsHandler)); // top left "details" button
+  buttons.push_back(Button(HAT_IN_DEBOUNCE_ID, stationDetailsHandler)); // 4: hat "in"/"OK"
+  buttons.push_back(Button(TOP_BUTTON_1_DEBOUNCE_ID, stationDetailsHandler)); // 5: top left "details" button
   buttons.push_back(Button(6, emptyBtnHandler)); // top middle "refresh" button
   buttons.push_back(Button(7, toggleHeatmapButtonHandler)); // top right "heatmap" button.
 
@@ -405,8 +470,7 @@ void setup() {
   screen.setBackground(TRANSPARENT_COLOR);
   screen.setWidget(&rowLayout);
   rowLayout.setRow(0, &topRow, 30);
-  rowLayout.setRow(1, &dataHeaderRow, 16);
-  rowLayout.setRow(2, &wifiScrollContainer, EQUAL); // VScroll expands to fill available space.
+  displayStationList(); // set dataHeaderRow as row 1, wifiScrollContainer as row 2.
   rowLayout.setRow(3, &statusLineLabel, 16);
 
   wifiScrollContainer.setChild(&wifiListScroll);
@@ -416,7 +480,7 @@ void setup() {
   topRow.setBorder(BORDER_BOTTOM, TFT_BLUE);
   topRow.setBackground(TFT_LIGHTGREY);
   topRow.setPadding(0, 0, 4, 2); // 4 px padding top; 2 px on bottom b/c we get padding from border.
-  topRow.setColumn(0, &detailsButton, 70);
+  // topRow column 0 (70 px) set by setButton1() via displayStationList(), above.
   topRow.setColumn(1, &rescanButton, 70);
   topRow.setColumn(2, &heatmapButton, 75);
   topRow.setColumn(3, NULL, EQUAL); // Rest of space to the right is empty
@@ -511,6 +575,13 @@ void setup() {
 
   detailsHeatmap.setColor(TFT_WHITE);
 
+  // also theme the buttons displayed on the details page
+  detailsBackBtn.setColor(TFT_BLUE);
+  detailsBackBtn.setPadding(4, 4, 0, 0);
+
+  detailsDisableBtn.setColor(TFT_BLUE);
+  detailsDisableBtn.setPadding(4, 4, 0, 0);
+
   // Set up channel plans for global heatmaps.
   populateHeatmapChannelPlan(&wifi24GHzHeatmap, wifi24GHzChannelPlan);
   populateHeatmapChannelPlan(&wifi50GHzHeatmap, wifi50GHzChannelPlan);
@@ -518,8 +589,6 @@ void setup() {
   scanWifi(); // Populates VScroll and global heatmap elements.
   lcd.fillScreen(TFT_BLACK); // Clear 'loading' screen msg.
   screen.render();
-
-  setStatusLine("Scan complete.");
 }
 
 static StrLabel* ssidLabels[SCAN_MAX_NUMBER];
@@ -637,6 +706,18 @@ static void showStationDetails(size_t wifiIdx) {
     numModes++;
   }
 
+  if (numModes == 0 && pWifiAPRecord->primary > max24GHzChannelNum) {
+    // Channel mode bit was not specified, but this is a 5 GHz channel so it must be N.
+    strcat(detailsModesText, "n");
+    numModes++;
+  }
+
+  if (numModes == 0 && pWifiAPRecord->second != wifi_second_chan_t::WIFI_SECOND_CHAN_NONE) {
+    // Channel mode bit was not specified but this is a 40 MHz bandwidth channel so it must be N.
+    strcat(detailsModesText, "n");
+    numModes++;
+  }
+
   switch(pWifiAPRecord->authmode) {
   case wifi_auth_mode_t::WIFI_AUTH_OPEN:
     detailsSecurity.setText(SECURITY_OPEN);
@@ -675,7 +756,14 @@ static void showStationDetails(size_t wifiIdx) {
   // We've filled out all the new data. Present it to the user.
   rowLayout.setRow(1, NULL, 0); // Hide VScroll header row, if any.
   rowLayout.setRow(2, &detailsPanel, EQUAL); // Show the detailsPanel; use all vertical space.
-  screen.renderWidget(&rowLayout);
+
+  // Change 'Details' button to 'Back' button.
+  setButton1(&detailsBackBtn, backToStationListHandler);
+  buttons[HAT_IN_DEBOUNCE_ID].setHandler(emptyBtnHandler); // hat-in disabled.
+
+  carouselPos = ContentCarousel_Details;
+
+  screen.render(); // Redraw screen.
 }
 
 static void makeWifiRow(int wifiIdx) {

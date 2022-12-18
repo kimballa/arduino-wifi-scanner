@@ -8,6 +8,7 @@
 static void scanWifi();
 static void showStationDetails(size_t wifiIdx);
 static void stationDetailsHandler(uint8_t btnId, uint8_t btnState);
+static void refreshHandler(uint8_t btnId, uint8_t btnState);
 
 TFT_eSPI lcd;
 
@@ -208,6 +209,7 @@ static Heatmap *getHeatmapForChannel(int chan) {
 static constexpr uint8_t HAT_IN_DEBOUNCE_ID = 4;
 // The debouncer id for WIO_KEY_C (left-most button on top).
 static constexpr uint8_t TOP_BUTTON_1_DEBOUNCE_ID = 5;
+static constexpr uint8_t TOP_BUTTON_2_DEBOUNCE_ID = 6;
 
 // Set the button to display in the upper left (Either "Details" or "Back"), and assign
 // the appropriate physical button handler function for it.
@@ -216,14 +218,21 @@ void setButton1(UIButton *uiButton, buttonHandler_t handlerFn) {
   topRow.setColumn(0, uiButton, 70);
 }
 
+// Middle button configuration.
+void setButton2(UIButton *uiButton, buttonHandler_t handlerFn) {
+  buttons[TOP_BUTTON_2_DEBOUNCE_ID].setHandler(handlerFn);
+  topRow.setColumn(1, uiButton, 70);
+}
+
 // Set the main display area content to be the station list.
 void displayStationList() {
   rowLayout.setRow(1, &dataHeaderRow, 16);          // Enable header row.
   rowLayout.setRow(2, &wifiScrollContainer, EQUAL); // VScroll expands to fill available space.
-  setStatusLine("Scan complete.", false);
   setButton1(&detailsButton, stationDetailsHandler);
+  setButton2(&rescanButton, refreshHandler);
   buttons[HAT_IN_DEBOUNCE_ID].setHandler(stationDetailsHandler); // hat-in enabled.
   carouselPos = ContentCarousel_SignalList;
+  setStatusLine("");
 }
 
 // Adjust the main display area content
@@ -283,6 +292,21 @@ static void stationDetailsHandler(uint8_t btnId, uint8_t btnState) {
   detailsButton.setFocus(false);
   screen.renderWidget(&detailsButton);
   showStationDetails(wifiListScroll.selectIdx());
+}
+
+// Refresh the list.
+static void refreshHandler(uint8_t btnId, uint8_t btnState) {
+  if (btnState == BTN_PRESSED) {
+    rescanButton.setFocus(true);
+    screen.renderWidget(&rescanButton);
+    return;
+  }
+
+  // button released; defocus button and do action.
+  rescanButton.setFocus(false);
+  screen.renderWidget(&rescanButton);
+  scanWifi();
+  screen.render();
 }
 
 // Clicking the 'back' button in Station Details goes back to the station list.
@@ -481,7 +505,7 @@ void setup() {
   topRow.setBackground(TFT_LIGHTGREY);
   topRow.setPadding(0, 0, 4, 2); // 4 px padding top; 2 px on bottom b/c we get padding from border.
   // topRow column 0 (70 px) set by setButton1() via displayStationList(), above.
-  topRow.setColumn(1, &rescanButton, 70);
+  // topRow column 1 (70 px) set by setButton2() via displayStationList(), above.
   topRow.setColumn(2, &heatmapButton, 75);
   topRow.setColumn(3, NULL, EQUAL); // Rest of space to the right is empty
 
@@ -582,15 +606,12 @@ void setup() {
   detailsDisableBtn.setColor(TFT_BLUE);
   detailsDisableBtn.setPadding(4, 4, 0, 0);
 
-  // Set up channel plans for global heatmaps.
-  populateHeatmapChannelPlan(&wifi24GHzHeatmap, wifi24GHzChannelPlan);
-  populateHeatmapChannelPlan(&wifi50GHzHeatmap, wifi50GHzChannelPlan);
-
   scanWifi(); // Populates VScroll and global heatmap elements.
   lcd.fillScreen(TFT_BLACK); // Clear 'loading' screen msg.
   screen.render();
 }
 
+static bool hasScanned = false;
 static StrLabel* ssidLabels[SCAN_MAX_NUMBER];
 static IntLabel* chanLabels[SCAN_MAX_NUMBER];
 static IntLabel* rssiLabels[SCAN_MAX_NUMBER];
@@ -813,8 +834,19 @@ static void makeWifiRow(int wifiIdx) {
 static void scanWifi() {
   DBGPRINT("scan start");
 
-  // TODO(aaron): If this has already been called, free all the existing used memory,
+  setStatusLine("Searching for stations...");
+
+  // If this has already been called before, free all the existing used memory,
   // by deleting all the pointed-to things from the ptrs in the various arrays.
+  if (hasScanned) {
+    for (int i = 0; i < SCAN_MAX_NUMBER; i++) {
+      delete ssidLabels[i];
+      delete chanLabels[i];
+      delete rssiLabels[i];
+      delete bssidLabels[i];
+      delete wifiRows[i];
+    }
+  }
 
   // Initialize all our arrays to have no data / NULL ptrs.
   for (int i = 0; i < SCAN_MAX_NUMBER; i++) {
@@ -829,8 +861,16 @@ static void scanWifi() {
 
   wifiListScroll.clear(); // Wipe scrollbox contents.
 
+  wifi24GHzHeatmap.clear();
+  wifi50GHzHeatmap.clear();
+
+  // Set up channel plans for global heatmaps.
+  populateHeatmapChannelPlan(&wifi24GHzHeatmap, wifi24GHzChannelPlan);
+  populateHeatmapChannelPlan(&wifi50GHzHeatmap, wifi50GHzChannelPlan);
+
   // WiFi.scanNetworks will return the number of networks found
   int n = WiFi.scanNetworks();
+  hasScanned = true;
 
   DBGPRINT("scan done");
   if (n == 0) {
@@ -842,6 +882,7 @@ static void scanWifi() {
   }
 
   wifiListScroll.setSelection(0);
+  setStatusLine("Scan complete.", false);
 }
 
 

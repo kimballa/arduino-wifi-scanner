@@ -58,6 +58,8 @@ public:
       _paddingL(0), _paddingR(0), _paddingTop(0), _paddingBottom(0) {
   };
 
+  virtual ~UIWidget() {};
+
   /** Render the widget to the screen, along with any child widgets. */
   virtual void render(TFT_eSPI &lcd, uint32_t renderFlags) = 0;
 

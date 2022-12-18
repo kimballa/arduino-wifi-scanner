@@ -32,6 +32,4 @@
 * Heatmap pages should hide all the top buttons except for 'Heatmap'/'Next'.
   * On transition into a heatmap, change the heatmap button's str to 'Next'.
 
-* Make "Refresh" button work.
-
 * Pull out UIWidgets into a separate library.

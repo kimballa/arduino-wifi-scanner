@@ -26,7 +26,7 @@ void Heatmap::defineChannel(int channelNum) {
 }
 
 void Heatmap::addSignal(int channelNum, int rssi) {
-  unsigned int channelIdx = idxForChannelNum(channelNum);
+  size_t channelIdx = _idxForChannelNum(channelNum);
   if (CHANNEL_NOT_FOUND == channelIdx) {
     // Disregard this signal; invalid channel.
     return;
@@ -46,7 +46,7 @@ void Heatmap::addSignal(int channelNum, int rssi) {
 }
 
 
-unsigned int Heatmap::idxForChannelNum(int channelNum) const {
+size_t Heatmap::_idxForChannelNum(int channelNum) const {
   for (unsigned int i = 0; i < _channels.size(); i++) {
     if (_channels[i] == channelNum) {
       return i;
@@ -54,6 +54,36 @@ unsigned int Heatmap::idxForChannelNum(int channelNum) const {
   }
 
   return CHANNEL_NOT_FOUND; // Couldn't find it.
+}
+
+// Return the next (higher) channel number in the band plan above `channelNum` or
+// NO_CHANNEL if none is found. (i.e., channelNum is the highest in the band plan.)
+int Heatmap::channelNumAbove(int channelNum) const {
+  size_t idx = _idxForChannelNum(channelNum);
+  if (idx == CHANNEL_NOT_FOUND) {
+    return NO_CHANNEL;
+  }
+
+  if (idx >= _channels.size() - 1) {
+    return NO_CHANNEL;
+  }
+
+  return _channels[idx + 1];
+}
+
+// Return the previous (lower) channel number in the band plan below `channelNum` or
+// NO_CHANNEL if none is found. (i.e., channelNum is the lowest in the band plan.)
+int Heatmap::channelNumBelow(int channelNum) const {
+  size_t idx = _idxForChannelNum(channelNum);
+  if (idx == CHANNEL_NOT_FOUND) {
+    return NO_CHANNEL;
+  }
+
+  if (idx == 0) {
+    return NO_CHANNEL;
+  }
+
+  return _channels[idx - 1];
 }
 
 void Heatmap::render(TFT_eSPI &lcd, uint32_t renderFlags) {

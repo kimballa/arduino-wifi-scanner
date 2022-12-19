@@ -7,21 +7,4 @@
   * Checkbox ?
   * Radio button ?
 
-* Handle 40 MHz crosstalk on 5G
-* Handle 40 MHz crosstalk on 2.4 GHz
-
-
-  * 802.11a/g (2.4 GHz) spectral fall-off:
-    chan dist     freq dist    power
-    1             +/- 5 MHz        0
-    2             +/-10 MHz      -15 dBm (x1/32 Watts pwr)
-    3             +/-15 MHz      -25 dBm (x1/128 W pwr)
-    4             +/-20 Mhz      -28 dBm (x1/256 W pwr) (Considered non-interfering)
-  * 802.11b (2.4 GHz) spectral fall-off:
-    chan dist     freq dist    power
-    1             +/- 5 MHz        0
-    2             +/-10 MHz        0 dBm
-    3             +/-15 MHz      -30 dBm (x1/512 W pwr)
-    4             +/-20 Mhz      -50 dBm (Non-interfering)
-
 * Pull out UIWidgets into a separate library.

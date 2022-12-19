@@ -12,6 +12,7 @@ static void disableStation(size_t wifiIdx);
 static void enableStation(size_t wifiIdx);
 static void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<int> &channelPlan);
 static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *bandHeatmap);
+static Heatmap *getHeatmapForChannel(int chan);
 
 // Button handler functions.
 static void stationDetailsHandler(uint8_t btnId, uint8_t btnState);
@@ -180,91 +181,6 @@ static inline void setButton3(UIButton *uiButton, buttonHandler_t handlerFn) {
   topRow.setColumn(2, uiButton, 75);
 }
 
-////////   US FCC 802.11 channel band plan   ////////
-
-// Arrays that define the channel numbers in each frequency range
-static constexpr tc::const_array<int> wifi24GHzChannelPlan = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
-static constexpr tc::const_array<int> wifi50GHzChannelPlan = {
-  32, 36, 40, 44, 48,        // U-NII-1 channels, unrestricted
-  // 52, 56, 60, 64, 68, 96, // U-NII-1 and 2A, use DFS or below 500mW
-  // 100, 104, 108, 112,
-  // 116, 120, 124, 128,
-  // 132, 136, 140, 144,     // U-NII-2C and 3; use DFS or below 500mW
-  149, 153, 157, 161, 165,   // U-NII-3 channels,  unrestricted
-  // 169, 173, 177,             // U-NII-4 1W, indoor usage only (since 2020)
-};
-
-////////   802.11 bandwidth spectral masks   ////////
-
-/**
- * The 802.11b spectral mask specifies that the signal overlaps adjacent channels
- * in the following way:
- * at +/- 5 MHz (1 channel away): 0 dBm signal diff
- * at +/-10 MHz (2 channels out): 0 dBm
- * at +/-15 MHz (3 channels out): -30 dBm
- * at +/-20 MHz (4 channels out): -30 dBm
- * Further out is -50 dBm, effectively no interference.
- * (See https://www.rfcafe.com/references/electrical/wlan-masks.htm)
- *
- * The spectral mask definitions here are one-sided, but are applied symmetrically around
- * the primary (center) channel.
- */
-static tc::vector<int> spectralMask80211B = { 0, 0, -30, -30 };
-
-// 802.11a and g have the following mask, along with 20 MHz 802.11n:
-// +/-  5 MHz:     0 dBm
-// +/- 10 MHz:   -10 dBm
-// +/- 15 MHz:   -26 dBm (actually -25.9 dBm)
-// +/- 20 MHz:   -28 dBm
-// Further out is -35 dBm or lower; non-interfering.
-static tc::vector<int> spectralMask80211G = { 0, -10, -26, -28 };
-
-// 802.11n in 40 MHz mode on 2.4 GHz wifi blocks an enormous number of channels:
-// +/-  5 MHz:    0 dBm
-// +/- 10 MHz:    0 dBm
-// +/- 15 MHz:    0 dBm
-// +/- 20 MHz:  -10 dBm
-// +/- 25 MHz:  -22 dBm
-// +/- 30 MHz:  -25 dBm
-// +/- 35 MHz:  -27 dBm
-// +/- 40 MHz:  -30 dBm
-//
-// This mask array reflects that for a 40 MHz bandwidth true channel, the primary channel num
-// is at -10 MHz and secondary at +10 MHz (or vice versa).
-//
-// The center of the
-// true channel is offset from the reported primary channel and we need to look at the data
-// struct to see whether the true center is above or below the primary channel id.
-//
-// So at +15 MHz from the true channel, we are at +5 MHz in the array below (  0 dBm)
-//    at +20 MHz from the true channel, we are at +10 MHz in array below    (-10 dBm)
-//    ... and so on...
-//
-// See https://www.researchgate.net/figure/80211-spectral-masks_fig3_261382549
-static tc::vector<int> spectralMask80211N40MHz24G = { 0, -10, -22, -25, -27, -30 };
-
-// 802.11n in 40 MHz mode on 5 GHz wifi (20 MHz channel spacing):
-// TODO(aaron): Adjust for offset true channel center.
-static tc::vector<int> spectralMask80211N40MHz50G = { 0, -10, -30 };
-
-static tc::vector<int> emptySpectralMask = {};
-
-// Ignore signals with power < -90 dBm when constructing the interference heatmap.
-static constexpr int noiseFloorDBm = -90;
-
-// Max 2.4 GHz channel id in US band plan is 11.
-static constexpr int max24GHzChannelNum = 11;
-
-/** Return the heatmap associated with a particular channel. */
-static Heatmap *getHeatmapForChannel(int chan) {
-  // TODO(aaron): This will always return a heatmap, including for invalid channels. OK?
-  if (chan <= max24GHzChannelNum) {
-    return &wifi24GHzHeatmap;
-  } else {
-    return &wifi50GHzHeatmap;
-  }
-}
-
 ////////    bitfield for suppression of stations in interference chart    ////////
 
 // A bitfield of at least 60 bits where a 1 bit at position i indicates that wifi_idx 'i'
@@ -294,6 +210,39 @@ void clearDisabledStations() {
   stationDisabledBits[0] = 0;
   stationDisabledBits[1] = 0;
 }
+
+
+////////   US FCC 802.11 channel band plan   ////////
+
+// Arrays that define the channel numbers in each frequency range
+static constexpr tc::const_array<int> wifi24GHzChannelPlan = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+
+static constexpr tc::const_array<int> wifi50GHzChannelPlan = {
+  32, 36, 40, 44, 48,        // U-NII-1 channels, unrestricted
+  // 52, 56, 60, 64, 68, 96, // U-NII-1 and 2A, use DFS or below 500mW
+  // 100, 104, 108, 112,
+  // 116, 120, 124, 128,
+  // 132, 136, 140, 144,     // U-NII-2C and 3; use DFS or below 500mW
+  149, 153, 157, 161, 165,   // U-NII-3 channels,  unrestricted
+  169, // 173, 177,          // U-NII-4 1W, indoor usage only (since 2020)
+};
+
+// 20 MHz channels in the 5 GHz US channel numbering plan are all 4 apart from each other
+// (preserving room for the 40 and 80 MHz channels in between, where appropriate).
+// See https://en.wikipedia.org/wiki/List_of_WLAN_channels#5_GHz_(802.11a/h/j/n/ac/ax)
+static constexpr int ADJACENT_50_GHZ_CHAN_DELTA = 4;
+
+// 2.4 GHz channel numbers with 5 MHz bandwidth are all 1 apart from each other.
+static constexpr int ADJACENT_24_GHZ_CHAN_DELTA = 1;
+
+// 2.4 GHz channel ids in the US band plan range from 1 to 11.
+static constexpr int min24GHzChannelNum = 1;
+static constexpr int max24GHzChannelNum = 11;
+
+// 5 GHz channel ids in teh US band plan range from 32 to 177 (U-NII-4)
+static constexpr int min50GHzChannelNum = 32;
+static constexpr int max50GHzChannelNum = 177;
+
 
 
 ////////    Transitions between different main content area states    ////////
@@ -695,6 +644,81 @@ static void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<i
 }
 
 
+
+////////   802.11 bandwidth spectral masks   ////////
+
+/**
+ * The 802.11b spectral mask specifies that the signal overlaps adjacent channels
+ * in the following way:
+ * at +/- 5 MHz (1 channel away): 0 dBm signal diff
+ * at +/-10 MHz (2 channels out): 0 dBm
+ * at +/-15 MHz (3 channels out): -30 dBm
+ * at +/-20 MHz (4 channels out): -30 dBm
+ * Further out is -50 dBm, effectively no interference.
+ * (See https://www.rfcafe.com/references/electrical/wlan-masks.htm)
+ *
+ * The spectral mask definitions here are one-sided, but are applied symmetrically around
+ * the primary (center) channel.
+ */
+static constexpr tc::const_array<int> spectralMask80211B = { 0, 0, -30, -30 };
+
+// 802.11a and g have the following mask, along with 20 MHz 802.11n:
+// +/-  5 MHz:     0 dBm
+// +/- 10 MHz:   -10 dBm
+// +/- 15 MHz:   -26 dBm (actually -25.9 dBm)
+// +/- 20 MHz:   -28 dBm
+// Further out is -35 dBm or lower; non-interfering.
+static constexpr tc::const_array<int> spectralMask80211G = { 0, -10, -26, -28 };
+
+// 802.11n in 40 MHz mode on 2.4 GHz wifi blocks an enormous number of channels:
+// +/-  5 MHz:    0 dBm
+// +/- 10 MHz:    0 dBm
+// +/- 15 MHz:    0 dBm
+// +/- 20 MHz:  -10 dBm
+// +/- 25 MHz:  -22 dBm
+// +/- 30 MHz:  -25 dBm
+// +/- 35 MHz:  -27 dBm
+// +/- 40 MHz:  -30 dBm
+//
+// This mask array reflects that for a 40 MHz bandwidth true channel, the primary channel num
+// is at -10 MHz and secondary at +10 MHz (or vice versa).
+//
+// The center of the
+// true channel is offset from the reported primary channel and we need to look at the data
+// struct to see whether the true center is above or below the primary channel id.
+//
+// So at +15 MHz from the true channel, we are at +5 MHz in the array below (  0 dBm)
+//    at +20 MHz from the true channel, we are at +10 MHz in array below    (-10 dBm)
+//    ... and so on...
+//
+// See https://www.researchgate.net/figure/80211-spectral-masks_fig3_261382549
+static constexpr tc::const_array<int> spectralMask80211N40MHz24G = { 0, -10, -22, -25, -27, -30 };
+
+// 802.11n in 40 MHz mode on 5 GHz wifi (20 MHz channel spacing):
+// 2x 20 MHz primary channels are consumed at 0 dBm, and the adjacent 20 MHz channel on
+// either shoulder sees interference at -25 dBm.
+//
+// Note this mask is for 20 MHz channel spacing (5 GHz band), whereas all the other
+// 2.4 GHz-band spectral masks above are for 5 MHz channel spacing.
+static constexpr tc::const_array<int> spectralMask80211N40MHz50G = { -25 };
+
+// 20 MHz channel width in 5 GHz band doesn't interfere with any neighbors.
+static constexpr tc::const_array<int> emptySpectralMask = {};
+
+// Ignore signals with power < -90 dBm when constructing the interference heatmap.
+static constexpr int noiseFloorDBm = -90;
+
+
+/** Return the heatmap associated with a particular channel. */
+static Heatmap *getHeatmapForChannel(int chan) {
+  if (chan <= max24GHzChannelNum) {
+    return &wifi24GHzHeatmap;
+  } else {
+    return &wifi50GHzHeatmap;
+  }
+}
+
+
 ////////    Spectrum scanning; building the main station list VScroll & heatmap    ////////
 
 static bool hasScanned = false;
@@ -711,11 +735,19 @@ static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *
   int rssiVal = pWifiAPRecord->rssi;
 
   bool is24GHz = channelNum <= max24GHzChannelNum;
-  tc::vector<int> *pSpectralMask = NULL;
+  const tc::const_array<int> *pSpectralMask = NULL;
 
   int upperChannelNum = channelNum;
   int lowerChannelNum = channelNum;
 
+  // How far away is the next channel number? Depends on the frequency band.
+  int sequentialChannelDelta = is24GHz ? ADJACENT_24_GHZ_CHAN_DELTA : ADJACENT_50_GHZ_CHAN_DELTA;
+  // What is the extent of channel ids in the relevant band?
+  int minBandChannel = is24GHz ? min24GHzChannelNum : min50GHzChannelNum;
+  int maxBandChannel = is24GHz ? max24GHzChannelNum : max50GHzChannelNum;
+
+  // How many channels is this station occupying? If 20 MHz, exactly 1; if 40 MHz, it's this
+  // one and the one above or below it.
   switch (pWifiAPRecord->second) {
   case wifi_second_chan_t::WIFI_SECOND_CHAN_NONE:
     upperChannelNum = channelNum;
@@ -723,83 +755,87 @@ static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *
     break;
   case wifi_second_chan_t::WIFI_SECOND_CHAN_ABOVE:
     if (is24GHz) {
-      upperChannelNum = channelNum + 4; // +20 MHz from primary channel.
+      // +20 MHz from primary channel = 4x 5 MHz channels away.
+      upperChannelNum = channelNum + 4 * ADJACENT_24_GHZ_CHAN_DELTA;
     } else {
-      // 5 GHz
-      upperChannelNum = channelNum; //TODO: next up;
+      // 5 GHz: channel number for the next 20 MHz bandwidth channel up.
+      upperChannelNum = channelNum + ADJACENT_50_GHZ_CHAN_DELTA;
     }
     lowerChannelNum = channelNum;
     break;
   case wifi_second_chan_t::WIFI_SECOND_CHAN_BELOW:
     upperChannelNum = channelNum;
     if (is24GHz) {
-      lowerChannelNum = channelNum - 4; // -20 MHz from primary channel.
+      // -20 MHz from primary channel = 4x 5 MHz channels away.
+      lowerChannelNum = channelNum - 4 * ADJACENT_24_GHZ_CHAN_DELTA;
     } else {
-      // 5 GHz
-      lowerChannelNum = channelNum; //TODO: next below;
+      // 5 GHz: channel number for the next 20 MHz bandwidth channel down.
+      lowerChannelNum = channelNum - ADJACENT_50_GHZ_CHAN_DELTA;
     }
     break;
   }
 
   // Determine which mode(s) are active and load the appropriate cross-channel interference data.
-  if (pWifiAPRecord->phy_11b) {
-    // We are on 2.4 GHz 802.11b. (g or n may also be enabled, but the mask for 802.11b is
-    // more punishing to nearby channels, so apply this one to the interference chart.)
-    pSpectralMask = &spectralMask80211B;
-  } else if (pWifiAPRecord->phy_11n) {
-    // We are on 802.11n.
-    if (pWifiAPRecord->second == wifi_second_chan_t::WIFI_SECOND_CHAN_NONE) {
-      // 20 MHz bandwidth.
-      if (is24GHz) {
+  if (is24GHz) {
+    if (pWifiAPRecord->phy_11b) {
+      // We are on 2.4 GHz 802.11b. (g or n may also be enabled, but the mask for 802.11b is
+      // more punishing to nearby channels, so apply this one to the interference chart.)
+      pSpectralMask = &spectralMask80211B;
+    } else if (pWifiAPRecord->phy_11n || lowerChannelNum != upperChannelNum) {
+      // We are on 802.11n.
+      if (pWifiAPRecord->second == wifi_second_chan_t::WIFI_SECOND_CHAN_NONE) {
         // 20 MHz 2.4 GHz 802.11n shares spectral mask with 802.11g
         pSpectralMask = &spectralMask80211G;
       } else {
-        // 20 MHz 5 GHz 802.11n does not interfere with any adjacent channels.
-        pSpectralMask = &emptySpectralMask;
-      }
-    } else {
-      // 40 MHz bandwidth
-      if (is24GHz) {
+        // 40 MHz bandwidth
         // We are going to interfere with basically all the channels.
         pSpectralMask = &spectralMask80211N40MHz24G;
-      } else {
-        pSpectralMask = &spectralMask80211N40MHz50G;
       }
+    } else {
+      // We are on 2.4 GHz 802.11g
+      pSpectralMask = &spectralMask80211G;
     }
   } else {
-    // We are on 2.4 GHz 802.11g
-    pSpectralMask = &spectralMask80211G;
+    // 5 GHz band. If we're in 40 MHz bandwidth, we use one mask. For 20 MHz, we use the other.
+    // b/g/n flags not relevant.
+    if (lowerChannelNum != upperChannelNum) {
+      // 40 MHz dual-channel mode.
+      pSpectralMask = &spectralMask80211N40MHz50G;
+    } else {
+      // 20 MHz 5 GHz 802.11n does not interfere with any adjacent channels.
+      pSpectralMask = &emptySpectralMask;
+    }
   }
 
-  if (is24GHz) {
-    // First, fill in the range of [lowerChannelId, upperChannelId] with +0 dBm
-    for (int i = lowerChannelNum; i <= upperChannelNum; i++) {
-      if (i >= 0 && i <= max24GHzChannelNum) {
-        bandHeatmap->addSignal(i, rssiVal);
+  // Now that we have the spectral mask, record the rssi on the channels
+
+  // First, fill in the range of [lowerChannelId, upperChannelId] (with a stride of 1 or 4
+  // as appropriate) with +0 dBm
+  for (int i = lowerChannelNum; i <= upperChannelNum; i += sequentialChannelDelta) {
+    if (i >= minBandChannel && i <= maxBandChannel) {
+      bandHeatmap->addSignal(i, rssiVal);
+    }
+  }
+
+  // Add in cross-channel interference.
+  // For a two-sided channel definition (in 2.4 GHz), walk from upperChannelId + 0, 1, 2, 3...
+  // and apply the decay factor, as well as walking down from lowerChannelId - 0, 1, 2, 3...
+  // In 5 GHz, we walk at +/-4, +/-8, etc... `sequentialChannelDelta` holds the right increment
+  // for the relevant band.
+  int offset = sequentialChannelDelta;
+  for (int dbm: *pSpectralMask) {
+    int crosstalkRssi = rssiVal + dbm;
+    if (crosstalkRssi >= noiseFloorDBm) {
+      if (upperChannelNum + offset <= maxBandChannel) {
+        bandHeatmap->addSignal(upperChannelNum + offset, crosstalkRssi);
+      }
+
+      if (lowerChannelNum - offset >= minBandChannel) {
+        bandHeatmap->addSignal(lowerChannelNum - offset, crosstalkRssi);
       }
     }
 
-    // Add in cross-channel interference.
-    // For a two-sided channel definition, walk from upperChannelId + 0, 1, 2, 3... and apply the
-    // decay factor, as well as walking down from lowerChannelId - 0, 1, 2, 3...
-    int offset = 1;
-    for (int dbm: *pSpectralMask) {
-      int crosstalkRssi = rssiVal + dbm;
-      if (crosstalkRssi >= noiseFloorDBm) {
-        if (upperChannelNum + offset <= max24GHzChannelNum) {
-          bandHeatmap->addSignal(upperChannelNum + offset, crosstalkRssi);
-        }
-
-        if (lowerChannelNum - offset > 0) {
-          bandHeatmap->addSignal(lowerChannelNum - offset, crosstalkRssi);
-        }
-      }
-
-      offset++;
-    }
-  } else {
-    // TODO(aaron): 5 GHz interference
-    bandHeatmap->addSignal(lowerChannelNum, rssiVal);
+    offset += sequentialChannelDelta;
   }
 }
 

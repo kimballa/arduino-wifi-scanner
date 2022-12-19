@@ -24,7 +24,4 @@
     3             +/-15 MHz      -30 dBm (x1/512 W pwr)
     4             +/-20 Mhz      -50 dBm (Non-interfering)
 
-* Detail page: Btn to remove ssid from heatmaps
-  * Add 'enable'/'disable'
-
 * Pull out UIWidgets into a separate library.

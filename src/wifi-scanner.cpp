@@ -8,6 +8,10 @@
 static void scanWifi();
 static void displayDetails(size_t wifiIdx);
 static void populateStationDetails(size_t wifiIdx);
+static void disableStation(size_t wifiIdx);
+static void enableStation(size_t wifiIdx);
+void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<int> &channelPlan);
+static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *bandHeatmap);
 
 // Button handler functions.
 static void stationDetailsHandler(uint8_t btnId, uint8_t btnState);
@@ -16,13 +20,46 @@ static void toggleHeatmapButtonHandler(uint8_t btnId, uint8_t btnState);
 static void backToStationListHandler(uint8_t btnId, uint8_t btnState);
 static void scrollUpHandler(uint8_t btnId, uint8_t btnState);
 static void scrollDownHandler(uint8_t btnId, uint8_t btnState);
+static void enableStationHandler(uint8_t btnId, uint8_t btnState);
+static void disableStationHandler(uint8_t btnId, uint8_t btnState);
 
 TFT_eSPI lcd;
+
+constexpr unsigned int MAX_STATUS_LINE_LEN = 80; // max len in chars; buffer is +1 more for '\0'
+static char statusLine[MAX_STATUS_LINE_LEN + 1];
 
 static constexpr int16_t SSID_WIDTH = 140;
 static constexpr int16_t CHAN_WIDTH = 30;
 static constexpr int16_t RSSI_WIDTH = 30;
 static constexpr int16_t BSSID_WIDTH = 80;
+
+// A bitfield of at least 60 bits where a 1 bit at position i indicates that wifi_idx 'i'
+// is a *disabled* SSID that should be ignored in heatmaps.
+static uint32_t stationDisabledBits[2] = {0, 0};
+
+static bool isStationDisabled(size_t wifiIdx) {
+  size_t arrayOffset = wifiIdx / 32;
+  size_t bitPosition = wifiIdx % 32;
+
+  return (stationDisabledBits[arrayOffset] & (1 << bitPosition)) != 0;
+}
+
+// Update the bitfield for a particular wifiIdx's disabled status.
+static void setStationDisabledBit(size_t wifiIdx, bool disabled) {
+  size_t arrayOffset = wifiIdx / 32;
+  size_t bitPosition = wifiIdx % 32;
+
+  if (disabled) {
+    stationDisabledBits[arrayOffset] |= (1 << bitPosition);
+  } else {
+    stationDisabledBits[arrayOffset] &= ~(1 << bitPosition);
+  }
+}
+
+void clearDisabledStations() {
+  stationDisabledBits[0] = 0;
+  stationDisabledBits[1] = 0;
+}
 
 Screen screen(lcd);
 // The screen is a set of rows: row of buttons, then the main vscroll (or heatmap or details).
@@ -131,8 +168,6 @@ constexpr unsigned int ContentCarousel_Details = 3; // Show details of a given s
 static unsigned int carouselPos = ContentCarousel_SignalList;
 
 // Row 3: Status / msg line.
-constexpr unsigned int MAX_STATUS_LINE_LEN = 80; // max len in chars; buffer is +1 more for '\0'
-static char statusLine[MAX_STATUS_LINE_LEN + 1];
 static StrLabel statusLineLabel = StrLabel(statusLine);
 
 
@@ -303,7 +338,17 @@ void displayDetails(size_t wifiIdx) {
 
   // Change 'Details' button to 'Back' button.
   setButton1(&detailsBackBtn, backToStationListHandler);
-  setButton2(NULL, emptyBtnHandler);
+
+  // Second button position is either 'enable' or 'disable' depending on whether this
+  // station is currently disabled or enabled, respectively.
+  if (isStationDisabled(wifiIdx)) {
+    setButton2(&detailsDisableBtn, enableStationHandler);
+    detailsDisableBtn.setText(enableStr);
+  } else {
+    setButton2(&detailsDisableBtn, disableStationHandler);
+    detailsDisableBtn.setText(disableStr);
+  }
+
   setButton3(NULL, emptyBtnHandler);
   buttons[HAT_IN_DEBOUNCE_ID].setHandler(emptyBtnHandler); // hat-in disabled.
   buttons[HAT_UP_DEBOUNCE_ID].setHandler(scrollUpHandler); // hat scrolling enabled.
@@ -351,6 +396,72 @@ void setStatusLine(const char *in, bool immediateRedraw) {
   if (immediateRedraw) {
     screen.renderWidget(&statusLineLabel);
   }
+}
+
+char disableMessage[MAX_STATUS_LINE_LEN + 1];
+
+// Set the disabled bit to 'true' for wifiIdx and all other stations with the same SSID.
+// Recompute the heatmap without the disabled stations.
+static void disableStation(size_t wifiIdx) {
+  const char *disableSSID;
+  const wifi_ap_record_t *pWifiAPRecord =
+      reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(wifiIdx));
+  disableSSID = reinterpret_cast<const char*>(pWifiAPRecord->ssid);
+
+  for (size_t i = 0; i < SCAN_MAX_NUMBER; i++) {
+    pWifiAPRecord = reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
+    if (strcmp(reinterpret_cast<const char*>(pWifiAPRecord->ssid), disableSSID) == 0) {
+      // This SSID should be disabled.
+      setStationDisabledBit(i, true);
+    }
+  }
+
+  // Recompute heatmaps minus all the disabled stations.
+  wifi24GHzHeatmap.clear();
+  wifi50GHzHeatmap.clear();
+
+  // Set up channel plans for global heatmaps.
+  populateHeatmapChannelPlan(&wifi24GHzHeatmap, wifi24GHzChannelPlan);
+  populateHeatmapChannelPlan(&wifi50GHzHeatmap, wifi50GHzChannelPlan);
+
+  for (size_t i = 0; i < SCAN_MAX_NUMBER; i++) {
+    pWifiAPRecord = reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
+    int channelNum = pWifiAPRecord->primary;
+
+    if (!isStationDisabled(i)) {
+      recordSignalHeatmap(pWifiAPRecord, getHeatmapForChannel(channelNum));
+    }
+  }
+
+  memset(disableMessage, 0, MAX_STATUS_LINE_LEN + 1);
+  snprintf(disableMessage, MAX_STATUS_LINE_LEN, "Disabled station %u: %s",
+      wifiIdx, disableSSID);
+  setStatusLine(disableMessage);
+}
+
+// Set the disabled bit to 'false' for wifiIdx and all other stations with the same SSID.
+// Add the newly-enabled stations to the heatmap.
+static void enableStation(size_t wifiIdx) {
+  const char *enableSSID;
+  const wifi_ap_record_t *pWifiAPRecord =
+      reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(wifiIdx));
+  enableSSID = reinterpret_cast<const char*>(pWifiAPRecord->ssid);
+
+  for (size_t i = 0; i < SCAN_MAX_NUMBER; i++) {
+    pWifiAPRecord = reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
+    if (strcmp(reinterpret_cast<const char*>(pWifiAPRecord->ssid), enableSSID) == 0) {
+      // This SSID should be enabled.
+      setStationDisabledBit(i, false);
+      // Add it to the heatmap.
+      int channelNum = pWifiAPRecord->primary;
+      recordSignalHeatmap(pWifiAPRecord, getHeatmapForChannel(channelNum));
+    }
+  }
+
+  memset(disableMessage, 0, MAX_STATUS_LINE_LEN + 1);
+  snprintf(disableMessage, MAX_STATUS_LINE_LEN, "Enabled station %u: %s",
+      wifiIdx, enableSSID);
+  setStatusLine(disableMessage);
 }
 
 // 5-way hat "in" -- show details for current station.
@@ -508,6 +619,44 @@ static void toggleHeatmapButtonHandler(uint8_t btnId, uint8_t btnState) {
   screen.renderWidget(&heatmapButton);
   rotateContentCarousel(); // Move to the next heatmap (or channel list view)
   screen.render(); // Redraw entire screen.
+}
+
+// We are currently on the Details page and the user wants to enable a currently-disabled
+// station in the heatmap.
+static void enableStationHandler(uint8_t btnId, uint8_t btnState) {
+  if (btnState == BTN_PRESSED) {
+    detailsDisableBtn.setFocus(true);
+    screen.renderWidget(&detailsDisableBtn);
+    return;
+  }
+
+  // Button released; perform action.
+  detailsDisableBtn.setFocus(false);
+  detailsDisableBtn.setText(disableStr); // Change button label to "disable"
+  screen.renderWidget(&detailsDisableBtn);
+  buttons[TOP_BUTTON_2_DEBOUNCE_ID].setHandler(disableStationHandler); // Change button handler fn.
+
+  size_t curWifiIdx = wifiListScroll.selectIdx();
+  enableStation(curWifiIdx);
+}
+
+// We are currently on the Details page and the user wants to disable a currently-enabled
+// station in the heatmap.
+static void disableStationHandler(uint8_t btnId, uint8_t btnState) {
+  if (btnState == BTN_PRESSED) {
+    detailsDisableBtn.setFocus(true);
+    screen.renderWidget(&detailsDisableBtn);
+    return;
+  }
+
+  // Button released; perform action.
+  detailsDisableBtn.setFocus(false);
+  detailsDisableBtn.setText(enableStr); // Change button label to "enable"
+  screen.renderWidget(&detailsDisableBtn);
+  buttons[TOP_BUTTON_2_DEBOUNCE_ID].setHandler(enableStationHandler); // Change button handler fn.
+
+  size_t curWifiIdx = wifiListScroll.selectIdx();
+  disableStation(curWifiIdx);
 }
 
 void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<int> &channelPlan) {
@@ -912,6 +1061,8 @@ static void scanWifi() {
   memset(rssiLabels, 0, sizeof(IntLabel*) * SCAN_MAX_NUMBER);
   memset(bssidLabels, 0, sizeof(StrLabel*) * SCAN_MAX_NUMBER);
   memset(wifiRows, 0, sizeof(Cols*) * SCAN_MAX_NUMBER);
+
+  clearDisabledStations(); // indices of 'disabled' stations are invalid; clear out.
 
   wifiListScroll.clear(); // Wipe scrollbox contents.
 

@@ -6,9 +6,16 @@
 
 
 static void scanWifi();
-static void showStationDetails(size_t wifiIdx);
+static void displayDetails(size_t wifiIdx);
+static void populateStationDetails(size_t wifiIdx);
+
+// Button handler functions.
 static void stationDetailsHandler(uint8_t btnId, uint8_t btnState);
 static void refreshHandler(uint8_t btnId, uint8_t btnState);
+static void toggleHeatmapButtonHandler(uint8_t btnId, uint8_t btnState);
+static void backToStationListHandler(uint8_t btnId, uint8_t btnState);
+static void scrollUpHandler(uint8_t btnId, uint8_t btnState);
+static void scrollDownHandler(uint8_t btnId, uint8_t btnState);
 
 TFT_eSPI lcd;
 
@@ -22,12 +29,14 @@ Screen screen(lcd);
 static Rows rowLayout(4); // 3 rows.
 // the top row (#0) is a set of buttons.
 static Cols topRow(4); // 4 columns
-static const char *detailsStr = "Details";
-static const char *rescanStr = "Refresh";
-static const char *heatmapStr = "Heatmap";
+static const char detailsStr[] = "Details";
+static const char rescanStr[] = "Refresh";
+static const char heatmapStr[] = "Heatmap";
+static const char backStr[] = "Back";
 static UIButton detailsButton(detailsStr);
 static UIButton rescanButton(rescanStr);
 static UIButton heatmapButton(heatmapStr);
+static UIButton heatmapBackButton(backStr);
 
 // Row 1: Column headers for the main data table.
 static const char *hdrSsidStr = "SSID";
@@ -96,7 +105,6 @@ static StrLabel detailsSecurity(SECURITY_UNKNOWN);
 static const char hdrDetailsHeatmapStr[] = "Channel spectrum interference:";
 static StrLabel detailsHeatmapHdr(hdrDetailsHeatmapStr);
 
-static const char backStr[] = "Back"; // Button text to go back to the VScroll.
 static const char disableStr[] = "Disable"; // Button text to disable this SSID in heatmap analysis.
 static const char enableStr[] = "Enable"; // Button text to enable this SSID in heatmap analysis.
 static UIButton detailsBackBtn(backStr);
@@ -205,11 +213,14 @@ static Heatmap *getHeatmapForChannel(int chan) {
   }
 }
 
-// The debouncer id for 5-way hat "IN" / "OK"
-static constexpr uint8_t HAT_IN_DEBOUNCE_ID = 4;
+
+static constexpr uint8_t HAT_UP_DEBOUNCE_ID = 0;
+static constexpr uint8_t HAT_DOWN_DEBOUNCE_ID = 1;
+static constexpr uint8_t HAT_IN_DEBOUNCE_ID = 4; // debounce id for 5-way hat "IN" / "OK"
 // The debouncer id for WIO_KEY_C (left-most button on top).
 static constexpr uint8_t TOP_BUTTON_1_DEBOUNCE_ID = 5;
 static constexpr uint8_t TOP_BUTTON_2_DEBOUNCE_ID = 6;
+static constexpr uint8_t TOP_BUTTON_3_DEBOUNCE_ID = 7; // handler for WIO_KEY_A (right-most).
 
 // Set the button to display in the upper left (Either "Details" or "Back"), and assign
 // the appropriate physical button handler function for it.
@@ -224,15 +235,81 @@ void setButton2(UIButton *uiButton, buttonHandler_t handlerFn) {
   topRow.setColumn(1, uiButton, 70);
 }
 
+// Right button configuration
+void setButton3(UIButton *uiButton, buttonHandler_t handlerFn) {
+  buttons[TOP_BUTTON_3_DEBOUNCE_ID].setHandler(handlerFn);
+  topRow.setColumn(2, uiButton, 75);
+}
+
+
 // Set the main display area content to be the station list.
 void displayStationList() {
+  carouselPos = ContentCarousel_SignalList;
+
   rowLayout.setRow(1, &dataHeaderRow, 16);          // Enable header row.
   rowLayout.setRow(2, &wifiScrollContainer, EQUAL); // VScroll expands to fill available space.
   setButton1(&detailsButton, stationDetailsHandler);
   setButton2(&rescanButton, refreshHandler);
+  setButton3(&heatmapButton, toggleHeatmapButtonHandler);
+  heatmapButton.setText(heatmapStr);
   buttons[HAT_IN_DEBOUNCE_ID].setHandler(stationDetailsHandler); // hat-in enabled.
+  buttons[HAT_UP_DEBOUNCE_ID].setHandler(scrollUpHandler); // hat scrolling enabled.
+  buttons[HAT_DOWN_DEBOUNCE_ID].setHandler(scrollDownHandler);
   carouselPos = ContentCarousel_SignalList;
   setStatusLine("");
+}
+
+void displayHeatmap24GHz() {
+  carouselPos = ContentCarousel_Heatmap24;
+
+  rowLayout.setRow(1, NULL, 0); // Blank out header row above vscroll.
+  rowLayout.setRow(2, &wifi24GHzHeatmap, EQUAL); // Put in the 2.4 GHz spectrum heatmap
+  setStatusLine("2.4 GHz spectrum congestion");
+  setButton1(NULL, emptyBtnHandler); // disable 'details' btn.
+  setButton2(&rescanButton, refreshHandler);
+  setButton3(&heatmapButton, toggleHeatmapButtonHandler);
+  heatmapButton.setText(heatmapStr);
+  buttons[HAT_IN_DEBOUNCE_ID].setHandler(emptyBtnHandler); // hat-in disabled.
+  buttons[HAT_UP_DEBOUNCE_ID].setHandler(emptyBtnHandler); // hat scrolling disabled.
+  buttons[HAT_DOWN_DEBOUNCE_ID].setHandler(emptyBtnHandler);
+}
+
+void displayHeatmap50GHz() {
+  carouselPos = ContentCarousel_Heatmap50;
+
+  rowLayout.setRow(1, NULL, 0); // Blank out header row above vscroll.
+  rowLayout.setRow(2, &wifi50GHzHeatmap, EQUAL); // Put in the 5 GHz spectrum heatmap
+  setStatusLine("5 GHz spectrum congestion");
+  setButton1(NULL, emptyBtnHandler); // disable 'details' btn.
+  setButton2(&rescanButton, refreshHandler);
+  setButton3(&heatmapButton, toggleHeatmapButtonHandler);
+  // heatmapButton, when pressed again, goes back to station list.
+  heatmapButton.setText(backStr);
+  buttons[HAT_IN_DEBOUNCE_ID].setHandler(emptyBtnHandler); // hat-in disabled.
+  buttons[HAT_UP_DEBOUNCE_ID].setHandler(emptyBtnHandler); // hat scrolling disabled.
+  buttons[HAT_DOWN_DEBOUNCE_ID].setHandler(emptyBtnHandler);
+}
+
+// Set main display to be the Details page for a particular wifi station idx.
+void displayDetails(size_t wifiIdx) {
+  carouselPos = ContentCarousel_Details;
+
+  // populate all the widgets on the details page with data about this station
+  populateStationDetails(wifiIdx);
+
+  // We've filled out all the new data. Present it to the user.
+  rowLayout.setRow(1, NULL, 0); // Hide VScroll header row, if any.
+  rowLayout.setRow(2, &detailsPanel, EQUAL); // Show the detailsPanel; use all vertical space.
+
+  // Change 'Details' button to 'Back' button.
+  setButton1(&detailsBackBtn, backToStationListHandler);
+  setButton2(NULL, emptyBtnHandler);
+  setButton3(NULL, emptyBtnHandler);
+  buttons[HAT_IN_DEBOUNCE_ID].setHandler(emptyBtnHandler); // hat-in disabled.
+  buttons[HAT_UP_DEBOUNCE_ID].setHandler(scrollUpHandler); // hat scrolling enabled.
+  buttons[HAT_DOWN_DEBOUNCE_ID].setHandler(scrollDownHandler);
+
+  carouselPos = ContentCarousel_Details;
 }
 
 // Adjust the main display area content
@@ -247,14 +324,10 @@ void rotateContentCarousel() {
     displayStationList();
     break;
   case ContentCarousel_Heatmap24:
-    rowLayout.setRow(1, NULL, 0); // Blank out header row above vscroll.
-    rowLayout.setRow(2, &wifi24GHzHeatmap, EQUAL); // Put in the 2.4 GHz spectrum heatmap
-    setStatusLine("2.4 GHz spectrum congestion");
+    displayHeatmap24GHz();
     break;
   case ContentCarousel_Heatmap50:
-    rowLayout.setRow(1, NULL, 0); // Blank out header row above vscroll.
-    rowLayout.setRow(2, &wifi50GHzHeatmap, EQUAL); // Put in the 5 GHz spectrum heatmap
-    setStatusLine("5 GHz spectrum congestion");
+    displayHeatmap50GHz();
     break;
   default:
     // We are not in the ring carousel of pages so cannot go to the 'next' one. Probably
@@ -291,7 +364,8 @@ static void stationDetailsHandler(uint8_t btnId, uint8_t btnState) {
   // button released; defocus button and do action.
   detailsButton.setFocus(false);
   screen.renderWidget(&detailsButton);
-  showStationDetails(wifiListScroll.selectIdx());
+  displayDetails(wifiListScroll.selectIdx());
+  screen.render();
 }
 
 // Refresh the list.
@@ -329,11 +403,6 @@ static void backToStationListHandler(uint8_t btnId, uint8_t btnState) {
 
 // 5-way hat "up" -- scroll up the list.
 static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
-  if (carouselPos != ContentCarousel_SignalList && carouselPos != ContentCarousel_Details) {
-    // We are not in one of the screens where we can scroll at all; just ignore this button.
-    return;
-  }
-
   if (btnState == BTN_PRESSED) {
     if (carouselPos == ContentCarousel_SignalList) {
       wifiListScroll.renderScrollUp(lcd, true);
@@ -374,17 +443,13 @@ static void scrollUpHandler(uint8_t btnId, uint8_t btnState) {
     }
   } else if (carouselPos == ContentCarousel_Details) {
     // Just flip to the previous 'page' of details.
-    showStationDetails(wifiListScroll.selectIdx());
+    displayDetails(wifiListScroll.selectIdx());
+    screen.render();
   }
 }
 
 // 5-way hat "down" -- scroll down the list.
 static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
-  if (carouselPos != ContentCarousel_SignalList && carouselPos != ContentCarousel_Details) {
-    // We are not in one of the screens where we can scroll at all; just ignore this button.
-    return;
-  }
-
   if (btnState == BTN_PRESSED) {
     if (carouselPos == ContentCarousel_SignalList) {
       wifiListScroll.renderScrollDown(lcd, true);
@@ -426,7 +491,8 @@ static void scrollDownHandler(uint8_t btnId, uint8_t btnState) {
     }
   } else if (carouselPos == ContentCarousel_Details) {
     // Just flip to the next 'page' of details.
-    showStationDetails(wifiListScroll.selectIdx());
+    displayDetails(wifiListScroll.selectIdx());
+    screen.render();
   }
 }
 
@@ -469,14 +535,14 @@ void setup() {
     pinMode(pin, INPUT_PULLUP);
   }
 
-  buttons.push_back(Button(0, scrollUpHandler));    // hat up
-  buttons.push_back(Button(1, scrollDownHandler));  // hat down
-  buttons.push_back(Button(2, emptyBtnHandler)); // hat left
-  buttons.push_back(Button(3, emptyBtnHandler)); // hat right
+  buttons.push_back(Button(HAT_UP_DEBOUNCE_ID, scrollUpHandler));    // hat up
+  buttons.push_back(Button(HAT_DOWN_DEBOUNCE_ID, scrollDownHandler));  // hat down
+  buttons.push_back(Button(2, emptyBtnHandler)); // hat left (unused)
+  buttons.push_back(Button(3, emptyBtnHandler)); // hat right (unused)
   buttons.push_back(Button(HAT_IN_DEBOUNCE_ID, stationDetailsHandler)); // 4: hat "in"/"OK"
   buttons.push_back(Button(TOP_BUTTON_1_DEBOUNCE_ID, stationDetailsHandler)); // 5: top left "details" button
-  buttons.push_back(Button(6, emptyBtnHandler)); // top middle "refresh" button
-  buttons.push_back(Button(7, toggleHeatmapButtonHandler)); // top right "heatmap" button.
+  buttons.push_back(Button(TOP_BUTTON_2_DEBOUNCE_ID, emptyBtnHandler)); // top middle "refresh" button
+  buttons.push_back(Button(TOP_BUTTON_3_DEBOUNCE_ID, toggleHeatmapButtonHandler)); // right: "heatmap" btn.
 
   lcd.begin();
   lcd.setRotation(3);
@@ -506,7 +572,7 @@ void setup() {
   topRow.setPadding(0, 0, 4, 2); // 4 px padding top; 2 px on bottom b/c we get padding from border.
   // topRow column 0 (70 px) set by setButton1() via displayStationList(), above.
   // topRow column 1 (70 px) set by setButton2() via displayStationList(), above.
-  topRow.setColumn(2, &heatmapButton, 75);
+  // topRow column 2 (75 px) set by setButton3() via displayStationList(), above.
   topRow.setColumn(3, NULL, EQUAL); // Rest of space to the right is empty
 
   detailsButton.setColor(TFT_BLUE);
@@ -682,9 +748,9 @@ static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *
 }
 
 /**
- * Flip to the Details page for a particular wifi station.
+ * Populate the UI widget fields for the Details page for a particular wifi station.
  */
-static void showStationDetails(size_t wifiIdx) {
+static void populateStationDetails(size_t wifiIdx) {
   const wifi_ap_record_t *pWifiAPRecord =
       reinterpret_cast<const wifi_ap_record_t*>(WiFi.getScanInfoByIndex(wifiIdx));
 
@@ -773,18 +839,6 @@ static void showStationDetails(size_t wifiIdx) {
     populateHeatmapChannelPlan(&detailsHeatmap, wifi50GHzChannelPlan);
   }
   recordSignalHeatmap(pWifiAPRecord, &detailsHeatmap);
-
-  // We've filled out all the new data. Present it to the user.
-  rowLayout.setRow(1, NULL, 0); // Hide VScroll header row, if any.
-  rowLayout.setRow(2, &detailsPanel, EQUAL); // Show the detailsPanel; use all vertical space.
-
-  // Change 'Details' button to 'Back' button.
-  setButton1(&detailsBackBtn, backToStationListHandler);
-  buttons[HAT_IN_DEBOUNCE_ID].setHandler(emptyBtnHandler); // hat-in disabled.
-
-  carouselPos = ContentCarousel_Details;
-
-  screen.render(); // Redraw screen.
 }
 
 static void makeWifiRow(int wifiIdx) {

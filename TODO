@@ -25,11 +25,6 @@
     4             +/-20 Mhz      -50 dBm (Non-interfering)
 
 * Detail page: Btn to remove ssid from heatmaps
-  * Change top row buttons when in details state.
-  * Remove 'refresh', 'heatmap' buttons
   * Add 'enable'/'disable'
-
-* Heatmap pages should hide all the top buttons except for 'Heatmap'/'Next'.
-  * On transition into a heatmap, change the heatmap button's str to 'Next'.
 
 * Pull out UIWidgets into a separate library.

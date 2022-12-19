@@ -15,6 +15,8 @@
 #include<esp/esp_wifi_types.h> // Seeed rpcUnified
 #include<TFT_eSPI.h> // Seeed LCD
 #include<debounce.h>
+#include <tiny-collections.h>
+#include <uiwidgets.h>
 
 #define DEBUG
 #define DBG_PRETTY_FUNCTIONS
@@ -22,8 +24,6 @@
 //#define DBG_START_PAUSED
 #include<dbg.h>
 
-#include "collections/collections.h"
-#include "uiwidgets/uiwidgets.h"
 #include "heatmap.h"
 
 // Copies the specified text (up to 80 chars) into the status line buffer

@@ -3,8 +3,8 @@
 #ifndef _HEATMAP_H
 #define _HEATMAP_H
 
-#include "uiwidgets/uiwidgets.h"
-#include "collections/collections.h"
+#include <uiwidgets.h>
+#include <tiny-collections.h>
 
 class Heatmap : public UIWidget {
 public:

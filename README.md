@@ -16,9 +16,14 @@ library (and its extensive net of transitive dependencies for WiFi), and
 [Seeed\_Arduino\_LCD](https://github.com/Seeed-Studio/Seeed_Arduino_LCD)
 for LCD screen usage.
 
-Also uses my [debounce library](https://github.com/kimballa/button-debounce) for buttons
-and [PyArduinoDebug](https://github.com/kimballa/PyArduinoDebug) for debugger/logging
-support.
+Also uses the following libraries of mine:
+* [debounce](https://github.com/kimballa/button-debounce) for buttons
+* [PyArduinoDebug](https://github.com/kimballa/PyArduinoDebug) for debugger/logging
+  support
+* [tiny-collections](https://github.com/kimballa/tiny-collections) for STL-like collections
+  (`vector<T>`...)
+* [uiwidgets](https://github.com/kimballa/uiwidgets) for a UI widget interface built on top of
+  `TFT_eSPI`
 
 See the full `libs` list in the
 [Makefile](https://github.com/kimballa/arduino-wifi-scanner/blob/main/Makefile) for all

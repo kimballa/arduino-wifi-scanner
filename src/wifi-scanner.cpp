@@ -10,7 +10,7 @@ static void displayDetails(size_t wifiIdx);
 static void populateStationDetails(size_t wifiIdx);
 static void disableStation(size_t wifiIdx);
 static void enableStation(size_t wifiIdx);
-void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<int> &channelPlan);
+static void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<int> &channelPlan);
 static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *bandHeatmap);
 
 // Button handler functions.
@@ -219,12 +219,20 @@ static tc::vector<int> spectralMask80211G = { 0, -10, -26, -28 };
 // +/- 30 MHz:  -25 dBm
 // +/- 35 MHz:  -27 dBm
 // +/- 40 MHz:  -30 dBm
-// TODO(aaron): This is incorrect mask; it doesn't handle the fact that the center of the
+//
+// This mask array reflects that for a 40 MHz bandwidth true channel, the primary channel num
+// is at -10 MHz and secondary at +10 MHz (or vice versa).
+//
+// The center of the
 // true channel is offset from the reported primary channel and we need to look at the data
 // struct to see whether the true center is above or below the primary channel id.
 //
+// So at +15 MHz from the true channel, we are at +5 MHz in the array below (  0 dBm)
+//    at +20 MHz from the true channel, we are at +10 MHz in array below    (-10 dBm)
+//    ... and so on...
+//
 // See https://www.researchgate.net/figure/80211-spectral-masks_fig3_261382549
-static tc::vector<int> spectralMask80211N40MHz24G = { 0, 0, 0, -10, -22, -25, -27, -30 };
+static tc::vector<int> spectralMask80211N40MHz24G = { 0, -10, -22, -25, -27, -30 };
 
 // 802.11n in 40 MHz mode on 5 GHz wifi (20 MHz channel spacing):
 // TODO(aaron): Adjust for offset true channel center.
@@ -659,7 +667,7 @@ static void disableStationHandler(uint8_t btnId, uint8_t btnState) {
   disableStation(curWifiIdx);
 }
 
-void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<int> &channelPlan) {
+static void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<int> &channelPlan) {
   for (auto channel: channelPlan) {
     heatmap->defineChannel(channel);
   }
@@ -839,11 +847,36 @@ static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *
   int channelNum = pWifiAPRecord->primary;
   int rssiVal = pWifiAPRecord->rssi;
 
-  // Record the rssi of this ssid on its primary channel in the heatmap.
-  bandHeatmap->addSignal(channelNum, rssiVal);
-
   bool is24GHz = channelNum <= max24GHzChannelNum;
   tc::vector<int> *pSpectralMask = NULL;
+
+  int upperChannelNum = channelNum;
+  int lowerChannelNum = channelNum;
+
+  switch (pWifiAPRecord->second) {
+  case wifi_second_chan_t::WIFI_SECOND_CHAN_NONE:
+    upperChannelNum = channelNum;
+    lowerChannelNum = channelNum;
+    break;
+  case wifi_second_chan_t::WIFI_SECOND_CHAN_ABOVE:
+    if (is24GHz) {
+      upperChannelNum = channelNum + 4; // +20 MHz from primary channel.
+    } else {
+      // 5 GHz
+      upperChannelNum = channelNum; //TODO: next up;
+    }
+    lowerChannelNum = channelNum;
+    break;
+  case wifi_second_chan_t::WIFI_SECOND_CHAN_BELOW:
+    upperChannelNum = channelNum;
+    if (is24GHz) {
+      lowerChannelNum = channelNum - 4; // -20 MHz from primary channel.
+    } else {
+      // 5 GHz
+      lowerChannelNum = channelNum; //TODO: next below;
+    }
+    break;
+  }
 
   // Determine which mode(s) are active and load the appropriate cross-channel interference data.
   if (pWifiAPRecord->phy_11b) {
@@ -876,16 +909,26 @@ static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *
   }
 
   if (is24GHz) {
+    // First, fill in the range of [lowerChannelId, upperChannelId] with +0 dBm
+    for (int i = lowerChannelNum; i <= upperChannelNum; i++) {
+      if (i >= 0 && i <= max24GHzChannelNum) {
+        bandHeatmap->addSignal(i, rssiVal);
+      }
+    }
+
+    // Add in cross-channel interference.
+    // For a two-sided channel definition, walk from upperChannelId + 0, 1, 2, 3... and apply the
+    // decay factor, as well as walking down from lowerChannelId - 0, 1, 2, 3...
     int offset = 1;
     for (int dbm: *pSpectralMask) {
       int crosstalkRssi = rssiVal + dbm;
       if (crosstalkRssi >= noiseFloorDBm) {
-        if (channelNum + offset <= max24GHzChannelNum) {
-          bandHeatmap->addSignal(channelNum + offset, crosstalkRssi);
+        if (upperChannelNum + offset <= max24GHzChannelNum) {
+          bandHeatmap->addSignal(upperChannelNum + offset, crosstalkRssi);
         }
 
-        if (channelNum - offset > 0) {
-          bandHeatmap->addSignal(channelNum - offset, crosstalkRssi);
+        if (lowerChannelNum - offset > 0) {
+          bandHeatmap->addSignal(lowerChannelNum - offset, crosstalkRssi);
         }
       }
 
@@ -893,6 +936,7 @@ static void recordSignalHeatmap(const wifi_ap_record_t *pWifiAPRecord, Heatmap *
     }
   } else {
     // TODO(aaron): 5 GHz interference
+    bandHeatmap->addSignal(lowerChannelNum, rssiVal);
   }
 }
 
@@ -1087,6 +1131,7 @@ static void scanWifi() {
   }
 
   wifiListScroll.setSelection(0);
+  wifiListScroll.scrollTo(0);
   setStatusLine("Scan complete.", false);
 }
 

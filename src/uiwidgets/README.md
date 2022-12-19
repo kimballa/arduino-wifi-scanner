@@ -87,10 +87,12 @@ Menu (TODO)
 A collection of text lines that can each be selected.
 (TODO: Does this take over the whole screen?)
 
-VScroll (TODO)
+VScroll
 -------
 A container that holds a variable number of items, more than can be shown on the screen.
 A vertically-oriented scrollbar is on the right side; this can be scrolled to carousel which
-elements are rendered to the screen.
+elements are rendered to the screen. A line of this scrollable collection can be granted focus
+by virtue of being the 'selected' element of the VScroll; the selection can be moved up and down, as
+can the window of displayed elements.
 
 

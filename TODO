@@ -1,10 +1,1 @@
 
-* Make UI widget library
-  * clearAllFocus() should hierarchically reset all focus to false.
-  * need to have 'tab order' to walk through things the user can select?
-  * Do we need actions like Button::onClick() ? Or should that just get managed manually?
-  * Menu ?
-  * Checkbox ?
-  * Radio button ?
-
-* Pull out UIWidgets into a separate library.

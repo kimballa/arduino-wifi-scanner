@@ -4,25 +4,25 @@
 #define _WIFI_SCANNER_H
 
 // C/C++ includes
-#include<cstring>
+#include <cstring>
 
 // Arduino itself
-#include<Arduino.h>
+#include <Arduino.h>
 
 // Libraries
-#include<rpcWiFi.h> // Seeed rpcWiFi
-#include<rtl_wifi/wifi_constants.h>
-#include<esp/esp_wifi_types.h> // Seeed rpcUnified
-#include<TFT_eSPI.h> // Seeed LCD
-#include<debounce.h>
 #include <tiny-collections.h>
+#include <rpcWiFi.h> // Seeed rpcWiFi
+#include <rtl_wifi/wifi_constants.h>
+#include <esp/esp_wifi_types.h> // Seeed rpcUnified
+#include <TFT_eSPI.h> // Seeed LCD
+#include <debounce.h>
 #include <uiwidgets.h>
 
 #define DEBUG
 #define DBG_PRETTY_FUNCTIONS
 //#define DBG_WAIT_FOR_CONNECT
 //#define DBG_START_PAUSED
-#include<dbg.h>
+#include <dbg.h>
 
 #include "heatmap.h"
 

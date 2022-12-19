@@ -1,10 +1,10 @@
 // (c) Copyright 2022 Aaron Kimball
 //
-// Measure wifi signal usage.
+// Measure wifi spectrum usage
 
 #include "wifi-scanner.h"
 
-
+// fwd declarations.
 static void scanWifi();
 static void displayDetails(size_t wifiIdx);
 static void populateStationDetails(size_t wifiIdx);
@@ -23,45 +23,22 @@ static void scrollDownHandler(uint8_t btnId, uint8_t btnState);
 static void enableStationHandler(uint8_t btnId, uint8_t btnState);
 static void disableStationHandler(uint8_t btnId, uint8_t btnState);
 
-TFT_eSPI lcd;
 
+////////    GUI widgets and layout   ////////
+
+TFT_eSPI lcd;
+Screen screen(lcd);
+
+// Buffer for status message at bottom of display.
 constexpr unsigned int MAX_STATUS_LINE_LEN = 80; // max len in chars; buffer is +1 more for '\0'
 static char statusLine[MAX_STATUS_LINE_LEN + 1];
 
+// Widths for columns in main display
 static constexpr int16_t SSID_WIDTH = 140;
 static constexpr int16_t CHAN_WIDTH = 30;
 static constexpr int16_t RSSI_WIDTH = 30;
 static constexpr int16_t BSSID_WIDTH = 80;
 
-// A bitfield of at least 60 bits where a 1 bit at position i indicates that wifi_idx 'i'
-// is a *disabled* SSID that should be ignored in heatmaps.
-static uint32_t stationDisabledBits[2] = {0, 0};
-
-static bool isStationDisabled(size_t wifiIdx) {
-  size_t arrayOffset = wifiIdx / 32;
-  size_t bitPosition = wifiIdx % 32;
-
-  return (stationDisabledBits[arrayOffset] & (1 << bitPosition)) != 0;
-}
-
-// Update the bitfield for a particular wifiIdx's disabled status.
-static void setStationDisabledBit(size_t wifiIdx, bool disabled) {
-  size_t arrayOffset = wifiIdx / 32;
-  size_t bitPosition = wifiIdx % 32;
-
-  if (disabled) {
-    stationDisabledBits[arrayOffset] |= (1 << bitPosition);
-  } else {
-    stationDisabledBits[arrayOffset] &= ~(1 << bitPosition);
-  }
-}
-
-void clearDisabledStations() {
-  stationDisabledBits[0] = 0;
-  stationDisabledBits[1] = 0;
-}
-
-Screen screen(lcd);
 // The screen is a set of rows: row of buttons, then the main vscroll (or heatmap or details).
 static Rows rowLayout(4); // 3 rows.
 // the top row (#0) is a set of buttons.
@@ -90,7 +67,7 @@ static Cols dataHeaderRow(4); // 4 columns.
 // Row 2: The main focus of the screen:
 // * Starts as a VScroll list of wifi SSIDs.
 // * May also be a Panel with details for the selected SSID.
-// * May also be a Heatmap with viz of current wifi band congestion.
+// * May also be a Heatmap with viz of current wifi band congestion. (x2 for 2.4 and 5 GHz)
 static VScroll wifiListScroll;
 static Panel wifiScrollContainer; // Wrap VScroll in a container for padding.
 
@@ -171,11 +148,41 @@ static unsigned int carouselPos = ContentCarousel_SignalList;
 static StrLabel statusLineLabel = StrLabel(statusLine);
 
 
-// physical pushbuttons
+////////   physical pushbutton I/O   ////////
+
 static tc::vector<Button> buttons;
 static tc::vector<uint8_t> buttonGpioPins;
 
-// Arrays that define the channel numbers in each frequency range (US FCC band plan).
+static constexpr uint8_t HAT_UP_DEBOUNCE_ID = 0;
+static constexpr uint8_t HAT_DOWN_DEBOUNCE_ID = 1;
+static constexpr uint8_t HAT_IN_DEBOUNCE_ID = 4; // debounce id for 5-way hat "IN" / "OK"
+// Btn 1 is the debouncer id for WIO_KEY_C (left-most button on top):
+static constexpr uint8_t TOP_BUTTON_1_DEBOUNCE_ID = 5;
+static constexpr uint8_t TOP_BUTTON_2_DEBOUNCE_ID = 6;
+static constexpr uint8_t TOP_BUTTON_3_DEBOUNCE_ID = 7; // handler for WIO_KEY_A (right-most).
+
+// Set the button to display in the upper left (Either "Details" or "Back"), and assign
+// the appropriate physical button handler function for it.
+static inline void setButton1(UIButton *uiButton, buttonHandler_t handlerFn) {
+  buttons[TOP_BUTTON_1_DEBOUNCE_ID].setHandler(handlerFn);
+  topRow.setColumn(0, uiButton, 70);
+}
+
+// Middle button configuration.
+static inline void setButton2(UIButton *uiButton, buttonHandler_t handlerFn) {
+  buttons[TOP_BUTTON_2_DEBOUNCE_ID].setHandler(handlerFn);
+  topRow.setColumn(1, uiButton, 70);
+}
+
+// Right button configuration
+static inline void setButton3(UIButton *uiButton, buttonHandler_t handlerFn) {
+  buttons[TOP_BUTTON_3_DEBOUNCE_ID].setHandler(handlerFn);
+  topRow.setColumn(2, uiButton, 75);
+}
+
+////////   US FCC 802.11 channel band plan   ////////
+
+// Arrays that define the channel numbers in each frequency range
 static constexpr tc::const_array<int> wifi24GHzChannelPlan = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
 static constexpr tc::const_array<int> wifi50GHzChannelPlan = {
   32, 36, 40, 44, 48,        // U-NII-1 channels, unrestricted
@@ -186,6 +193,8 @@ static constexpr tc::const_array<int> wifi50GHzChannelPlan = {
   149, 153, 157, 161, 165,   // U-NII-3 channels,  unrestricted
   // 169, 173, 177,             // U-NII-4 1W, indoor usage only (since 2020)
 };
+
+////////   802.11 bandwidth spectral masks   ////////
 
 /**
  * The 802.11b spectral mask specifies that the signal overlaps adjacent channels
@@ -256,34 +265,38 @@ static Heatmap *getHeatmapForChannel(int chan) {
   }
 }
 
+////////    bitfield for suppression of stations in interference chart    ////////
 
-static constexpr uint8_t HAT_UP_DEBOUNCE_ID = 0;
-static constexpr uint8_t HAT_DOWN_DEBOUNCE_ID = 1;
-static constexpr uint8_t HAT_IN_DEBOUNCE_ID = 4; // debounce id for 5-way hat "IN" / "OK"
-// The debouncer id for WIO_KEY_C (left-most button on top).
-static constexpr uint8_t TOP_BUTTON_1_DEBOUNCE_ID = 5;
-static constexpr uint8_t TOP_BUTTON_2_DEBOUNCE_ID = 6;
-static constexpr uint8_t TOP_BUTTON_3_DEBOUNCE_ID = 7; // handler for WIO_KEY_A (right-most).
+// A bitfield of at least 60 bits where a 1 bit at position i indicates that wifi_idx 'i'
+// is a *disabled* SSID that should be ignored in heatmaps.
+static uint32_t stationDisabledBits[2] = {0, 0};
 
-// Set the button to display in the upper left (Either "Details" or "Back"), and assign
-// the appropriate physical button handler function for it.
-void setButton1(UIButton *uiButton, buttonHandler_t handlerFn) {
-  buttons[TOP_BUTTON_1_DEBOUNCE_ID].setHandler(handlerFn);
-  topRow.setColumn(0, uiButton, 70);
+static bool isStationDisabled(size_t wifiIdx) {
+  size_t arrayOffset = wifiIdx / 32;
+  size_t bitPosition = wifiIdx % 32;
+
+  return (stationDisabledBits[arrayOffset] & (1 << bitPosition)) != 0;
 }
 
-// Middle button configuration.
-void setButton2(UIButton *uiButton, buttonHandler_t handlerFn) {
-  buttons[TOP_BUTTON_2_DEBOUNCE_ID].setHandler(handlerFn);
-  topRow.setColumn(1, uiButton, 70);
+// Update the bitfield for a particular wifiIdx's disabled status.
+static void setStationDisabledBit(size_t wifiIdx, bool disabled) {
+  size_t arrayOffset = wifiIdx / 32;
+  size_t bitPosition = wifiIdx % 32;
+
+  if (disabled) {
+    stationDisabledBits[arrayOffset] |= (1 << bitPosition);
+  } else {
+    stationDisabledBits[arrayOffset] &= ~(1 << bitPosition);
+  }
 }
 
-// Right button configuration
-void setButton3(UIButton *uiButton, buttonHandler_t handlerFn) {
-  buttons[TOP_BUTTON_3_DEBOUNCE_ID].setHandler(handlerFn);
-  topRow.setColumn(2, uiButton, 75);
+void clearDisabledStations() {
+  stationDisabledBits[0] = 0;
+  stationDisabledBits[1] = 0;
 }
 
+
+////////    Transitions between different main content area states    ////////
 
 // Set the main display area content to be the station list.
 void displayStationList() {
@@ -390,6 +403,8 @@ void rotateContentCarousel() {
   }
 }
 
+////////    Update status line    ////////
+
 // Copies the specified text (up to 80 chars) into the status line buffer
 // and renders it to the bottom of the screen. If immediateRedraw=false,
 // the visible widget will not be updated until your next screen.render() call.
@@ -405,6 +420,9 @@ void setStatusLine(const char *in, bool immediateRedraw) {
     screen.renderWidget(&statusLineLabel);
   }
 }
+
+
+////////    Enable and disable stations from inclusion in interference heatmap    ////////
 
 char disableMessage[MAX_STATUS_LINE_LEN + 1];
 
@@ -471,6 +489,9 @@ static void enableStation(size_t wifiIdx) {
       wifiIdx, enableSSID);
   setStatusLine(disableMessage);
 }
+
+
+////////    GPIO Button handlers    ////////
 
 // 5-way hat "in" -- show details for current station.
 static void stationDetailsHandler(uint8_t btnId, uint8_t btnState) {
@@ -673,166 +694,8 @@ static void populateHeatmapChannelPlan(Heatmap *heatmap, const tc::const_array<i
   }
 }
 
-void setup() {
-  DBGSETUP();
-  //while (!Serial) { delay(10); }
 
-  // Register the pins for the 5-way hat button.
-  buttonGpioPins.push_back(WIO_5S_UP);    // Button 0
-  buttonGpioPins.push_back(WIO_5S_DOWN);  // Button 1
-  buttonGpioPins.push_back(WIO_5S_LEFT);  // Button 2
-  buttonGpioPins.push_back(WIO_5S_RIGHT); // Button 3
-  buttonGpioPins.push_back(WIO_5S_PRESS); // Button 4
-  // Add the 3 top-side buttons.
-  buttonGpioPins.push_back(WIO_KEY_C); // Button 5 ("C" is left-most btn on top)
-  buttonGpioPins.push_back(WIO_KEY_B); // Button 6
-  buttonGpioPins.push_back(WIO_KEY_A); // Button 7 ("A" is right-most btn on top)
-
-  for (auto pin: buttonGpioPins) {
-    pinMode(pin, INPUT_PULLUP);
-  }
-
-  buttons.push_back(Button(HAT_UP_DEBOUNCE_ID, scrollUpHandler));    // hat up
-  buttons.push_back(Button(HAT_DOWN_DEBOUNCE_ID, scrollDownHandler));  // hat down
-  buttons.push_back(Button(2, emptyBtnHandler)); // hat left (unused)
-  buttons.push_back(Button(3, emptyBtnHandler)); // hat right (unused)
-  buttons.push_back(Button(HAT_IN_DEBOUNCE_ID, stationDetailsHandler)); // 4: hat "in"/"OK"
-  buttons.push_back(Button(TOP_BUTTON_1_DEBOUNCE_ID, stationDetailsHandler)); // 5: top left "details" button
-  buttons.push_back(Button(TOP_BUTTON_2_DEBOUNCE_ID, emptyBtnHandler)); // top middle "refresh" button
-  buttons.push_back(Button(TOP_BUTTON_3_DEBOUNCE_ID, toggleHeatmapButtonHandler)); // right: "heatmap" btn.
-
-  lcd.begin();
-  lcd.setRotation(3);
-  lcd.fillScreen(TFT_BLACK);
-  lcd.setTextFont(2); // 0 for 8px, 2 for 16px.
-  lcd.setTextColor(TFT_WHITE);
-  lcd.drawString("Wifi analyzer starting up...", 4, 4);
-
-  // Set WiFi to station mode and disconnect from an AP if it was previously connected
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
-
-  // Set up main layout, with nav buttons, status, etc. and the station list vscroll.
-  screen.setBackground(TRANSPARENT_COLOR);
-  screen.setWidget(&rowLayout);
-  rowLayout.setRow(0, &topRow, 30);
-  displayStationList(); // set dataHeaderRow as row 1, wifiScrollContainer as row 2.
-  rowLayout.setRow(3, &statusLineLabel, 16);
-
-  wifiScrollContainer.setChild(&wifiListScroll);
-  wifiScrollContainer.setPadding(2, 2, 1, 1); // Add 1px padding around wifi list VScroll.
-
-  // topRow is a Cols that holds some buttons.
-  topRow.setBorder(BORDER_BOTTOM, TFT_BLUE);
-  topRow.setBackground(TFT_LIGHTGREY);
-  topRow.setPadding(0, 0, 4, 2); // 4 px padding top; 2 px on bottom b/c we get padding from border.
-  // topRow column 0 (70 px) set by setButton1() via displayStationList(), above.
-  // topRow column 1 (70 px) set by setButton2() via displayStationList(), above.
-  // topRow column 2 (75 px) set by setButton3() via displayStationList(), above.
-  topRow.setColumn(3, NULL, EQUAL); // Rest of space to the right is empty
-
-  detailsButton.setColor(TFT_BLUE);
-  detailsButton.setPadding(4, 4, 0, 0);
-
-  rescanButton.setColor(TFT_BLUE);
-  rescanButton.setPadding(4, 4, 0, 0);
-
-  heatmapButton.setColor(TFT_BLUE);
-  heatmapButton.setPadding(4, 4, 0, 0);
-
-  dataHeaderRow.setColumn(0, &hdrSsid, SSID_WIDTH);
-  dataHeaderRow.setColumn(1, &hdrChannel, CHAN_WIDTH);
-  dataHeaderRow.setColumn(2, &hdrRssi, RSSI_WIDTH);
-  dataHeaderRow.setColumn(3, &hdrBssid, BSSID_WIDTH);
-  dataHeaderRow.setBackground(TFT_BLUE);
-
-  hdrSsid.setBackground(TFT_BLUE);
-  hdrSsid.setColor(TFT_WHITE);
-  hdrSsid.setPadding(2, 0, 2, 0);
-
-  hdrRssi.setBackground(TFT_BLUE);
-  hdrRssi.setColor(TFT_WHITE);
-  hdrRssi.setPadding(0, 0, 2, 0);
-
-  hdrChannel.setBackground(TFT_BLUE);
-  hdrChannel.setColor(TFT_WHITE);
-  hdrChannel.setPadding(0, 0, 2, 0);
-
-  hdrBssid.setBackground(TFT_BLUE);
-  hdrBssid.setColor(TFT_WHITE);
-  hdrBssid.setPadding(0, 0, 2, 0);
-
-  statusLineLabel.setBackground(TFT_BLUE);
-  statusLineLabel.setPadding(2, 0, 3, 0);
-
-  // Set up Details page UI widgets.
-  detailsPanel.setChild(&detailsRows);
-  detailsPanel.setBackground(TFT_NAVY);
-  detailsPanel.setPadding(4, 4, 4, 4);
-  detailsRows.setRow(0, &detailsStationInfoCols, 24);
-  detailsRows.setRow(1, &detailsSsidCols, 24);
-  detailsRows.setRow(2, &detailsBssidCols, 24);
-  detailsRows.setRow(3, &detailsModeBwCols, 24);
-  detailsRows.setRow(4, &detailsSecurityCols, 24);
-  detailsRows.setRow(5, NULL, EQUAL); // Empty row: Fill available space.
-  detailsRows.setRow(6, &detailsHeatmapHdr, 16); // Entire row is header label for heatmap.
-  detailsRows.setRow(7, &detailsHeatmap, 32); // Entire bottom row is spectrum heatmap
-
-  detailsStationInfoCols.setColumn(0, &detailsChanHdr, 40);
-  detailsStationInfoCols.setColumn(1, &detailsChan, 40);
-  detailsStationInfoCols.setColumn(2, NULL, EQUAL);
-  detailsStationInfoCols.setColumn(3, &detailsRssiHdr, 40);
-  detailsStationInfoCols.setColumn(4, &detailsRssi, 40);
-  detailsStationInfoCols.setBorder(BORDER_BOTTOM);
-  detailsChanHdr.setColor(TFT_YELLOW);
-  detailsChanHdr.setFont(2); // larger font size for channel id.
-  detailsRssiHdr.setColor(TFT_YELLOW);
-  detailsRssiHdr.setFont(0);
-  detailsChan.setFont(2);
-  detailsRssi.setFont(0);
-
-  detailsSsidCols.setColumn(0, &detailsSsidHdr, 40);
-  detailsSsidCols.setColumn(1, &detailsSsid, EQUAL);
-  detailsSsidHdr.setColor(TFT_YELLOW);
-  detailsSsidHdr.setFont(2); // larger font size for SSID.
-  detailsSsid.setFont(2);
-
-  detailsBssidCols.setColumn(0, &detailsBssidHdr, 40);
-  detailsBssidCols.setColumn(1, &detailsBssid, EQUAL);
-  detailsBssidHdr.setColor(TFT_YELLOW);
-  detailsBssidHdr.setFont(2); // larger font size for BSSID.
-  detailsBssid.setFont(2);
-
-  detailsModeBwCols.setColumn(0, &detailsModes, EQUAL);
-  detailsModeBwCols.setColumn(1, &detailsBandwidth, EQUAL);
-  detailsModes.setColor(TFT_YELLOW);
-  detailsModes.setFont(0);
-  detailsBandwidth.setColor(TFT_YELLOW);
-  detailsBandwidth.setFont(0);
-
-  detailsSecurityCols.setColumn(0, &detailsSecurityHdr, 60);
-  detailsSecurityCols.setColumn(1, &detailsSecurity, EQUAL);
-  detailsSecurityHdr.setColor(TFT_YELLOW);
-  detailsSecurityHdr.setFont(2);
-  detailsSecurity.setFont(2);
-
-  detailsHeatmapHdr.setColor(TFT_YELLOW);
-  detailsHeatmapHdr.setFont(0);
-
-  detailsHeatmap.setColor(TFT_WHITE);
-
-  // also theme the buttons displayed on the details page
-  detailsBackBtn.setColor(TFT_BLUE);
-  detailsBackBtn.setPadding(4, 4, 0, 0);
-
-  detailsDisableBtn.setColor(TFT_BLUE);
-  detailsDisableBtn.setPadding(4, 4, 0, 0);
-
-  scanWifi(); // Populates VScroll and global heatmap elements.
-  lcd.fillScreen(TFT_BLACK); // Clear 'loading' screen msg.
-  screen.render();
-}
+////////    Spectrum scanning; building the main station list VScroll & heatmap    ////////
 
 static bool hasScanned = false;
 static StrLabel* ssidLabels[SCAN_MAX_NUMBER];
@@ -1135,6 +998,169 @@ static void scanWifi() {
   setStatusLine("Scan complete.", false);
 }
 
+
+////////    Arduino main setup & loop    ////////
+
+void setup() {
+  DBGSETUP();
+  //while (!Serial) { delay(10); }
+
+  // Register the pins for the 5-way hat button.
+  buttonGpioPins.push_back(WIO_5S_UP);    // Button 0
+  buttonGpioPins.push_back(WIO_5S_DOWN);  // Button 1
+  buttonGpioPins.push_back(WIO_5S_LEFT);  // Button 2
+  buttonGpioPins.push_back(WIO_5S_RIGHT); // Button 3
+  buttonGpioPins.push_back(WIO_5S_PRESS); // Button 4
+  // Add the 3 top-side buttons.
+  buttonGpioPins.push_back(WIO_KEY_C); // Button 5 ("C" is left-most btn on top)
+  buttonGpioPins.push_back(WIO_KEY_B); // Button 6
+  buttonGpioPins.push_back(WIO_KEY_A); // Button 7 ("A" is right-most btn on top)
+
+  for (auto pin: buttonGpioPins) {
+    pinMode(pin, INPUT_PULLUP);
+  }
+
+  buttons.push_back(Button(HAT_UP_DEBOUNCE_ID, scrollUpHandler));    // hat up
+  buttons.push_back(Button(HAT_DOWN_DEBOUNCE_ID, scrollDownHandler));  // hat down
+  buttons.push_back(Button(2, emptyBtnHandler)); // hat left (unused)
+  buttons.push_back(Button(3, emptyBtnHandler)); // hat right (unused)
+  buttons.push_back(Button(HAT_IN_DEBOUNCE_ID, stationDetailsHandler)); // 4: hat "in"/"OK"
+  buttons.push_back(Button(TOP_BUTTON_1_DEBOUNCE_ID, stationDetailsHandler)); // 5: top left "details" button
+  buttons.push_back(Button(TOP_BUTTON_2_DEBOUNCE_ID, emptyBtnHandler)); // top middle "refresh" button
+  buttons.push_back(Button(TOP_BUTTON_3_DEBOUNCE_ID, toggleHeatmapButtonHandler)); // right: "heatmap" btn.
+
+  lcd.begin();
+  lcd.setRotation(3);
+  lcd.fillScreen(TFT_BLACK);
+  lcd.setTextFont(2); // 0 for 8px, 2 for 16px.
+  lcd.setTextColor(TFT_WHITE);
+  lcd.drawString("Wifi analyzer starting up...", 4, 4);
+
+  // Set WiFi to station mode and disconnect from an AP if it was previously connected
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+
+  // Set up main layout, with nav buttons, status, etc. and the station list vscroll.
+  screen.setBackground(TRANSPARENT_COLOR);
+  screen.setWidget(&rowLayout);
+  rowLayout.setRow(0, &topRow, 30);
+  displayStationList(); // set dataHeaderRow as row 1, wifiScrollContainer as row 2.
+  rowLayout.setRow(3, &statusLineLabel, 16);
+
+  wifiScrollContainer.setChild(&wifiListScroll);
+  wifiScrollContainer.setPadding(2, 2, 1, 1); // Add 1px padding around wifi list VScroll.
+
+  // topRow is a Cols that holds some buttons.
+  topRow.setBorder(BORDER_BOTTOM, TFT_BLUE);
+  topRow.setBackground(TFT_LIGHTGREY);
+  topRow.setPadding(0, 0, 4, 2); // 4 px padding top; 2 px on bottom b/c we get padding from border.
+  // topRow column 0 (70 px) set by setButton1() via displayStationList(), above.
+  // topRow column 1 (70 px) set by setButton2() via displayStationList(), above.
+  // topRow column 2 (75 px) set by setButton3() via displayStationList(), above.
+  topRow.setColumn(3, NULL, EQUAL); // Rest of space to the right is empty
+
+  detailsButton.setColor(TFT_BLUE);
+  detailsButton.setPadding(4, 4, 0, 0);
+
+  rescanButton.setColor(TFT_BLUE);
+  rescanButton.setPadding(4, 4, 0, 0);
+
+  heatmapButton.setColor(TFT_BLUE);
+  heatmapButton.setPadding(4, 4, 0, 0);
+
+  dataHeaderRow.setColumn(0, &hdrSsid, SSID_WIDTH);
+  dataHeaderRow.setColumn(1, &hdrChannel, CHAN_WIDTH);
+  dataHeaderRow.setColumn(2, &hdrRssi, RSSI_WIDTH);
+  dataHeaderRow.setColumn(3, &hdrBssid, BSSID_WIDTH);
+  dataHeaderRow.setBackground(TFT_BLUE);
+
+  hdrSsid.setBackground(TFT_BLUE);
+  hdrSsid.setColor(TFT_WHITE);
+  hdrSsid.setPadding(2, 0, 2, 0);
+
+  hdrRssi.setBackground(TFT_BLUE);
+  hdrRssi.setColor(TFT_WHITE);
+  hdrRssi.setPadding(0, 0, 2, 0);
+
+  hdrChannel.setBackground(TFT_BLUE);
+  hdrChannel.setColor(TFT_WHITE);
+  hdrChannel.setPadding(0, 0, 2, 0);
+
+  hdrBssid.setBackground(TFT_BLUE);
+  hdrBssid.setColor(TFT_WHITE);
+  hdrBssid.setPadding(0, 0, 2, 0);
+
+  statusLineLabel.setBackground(TFT_BLUE);
+  statusLineLabel.setPadding(2, 0, 3, 0);
+
+  // Set up Details page UI widgets.
+  detailsPanel.setChild(&detailsRows);
+  detailsPanel.setBackground(TFT_NAVY);
+  detailsPanel.setPadding(4, 4, 4, 4);
+  detailsRows.setRow(0, &detailsStationInfoCols, 24);
+  detailsRows.setRow(1, &detailsSsidCols, 24);
+  detailsRows.setRow(2, &detailsBssidCols, 24);
+  detailsRows.setRow(3, &detailsModeBwCols, 24);
+  detailsRows.setRow(4, &detailsSecurityCols, 24);
+  detailsRows.setRow(5, NULL, EQUAL); // Empty row: Fill available space.
+  detailsRows.setRow(6, &detailsHeatmapHdr, 16); // Entire row is header label for heatmap.
+  detailsRows.setRow(7, &detailsHeatmap, 32); // Entire bottom row is spectrum heatmap
+
+  detailsStationInfoCols.setColumn(0, &detailsChanHdr, 40);
+  detailsStationInfoCols.setColumn(1, &detailsChan, 40);
+  detailsStationInfoCols.setColumn(2, NULL, EQUAL);
+  detailsStationInfoCols.setColumn(3, &detailsRssiHdr, 40);
+  detailsStationInfoCols.setColumn(4, &detailsRssi, 40);
+  detailsStationInfoCols.setBorder(BORDER_BOTTOM);
+  detailsChanHdr.setColor(TFT_YELLOW);
+  detailsChanHdr.setFont(2); // larger font size for channel id.
+  detailsRssiHdr.setColor(TFT_YELLOW);
+  detailsRssiHdr.setFont(0);
+  detailsChan.setFont(2);
+  detailsRssi.setFont(0);
+
+  detailsSsidCols.setColumn(0, &detailsSsidHdr, 40);
+  detailsSsidCols.setColumn(1, &detailsSsid, EQUAL);
+  detailsSsidHdr.setColor(TFT_YELLOW);
+  detailsSsidHdr.setFont(2); // larger font size for SSID.
+  detailsSsid.setFont(2);
+
+  detailsBssidCols.setColumn(0, &detailsBssidHdr, 40);
+  detailsBssidCols.setColumn(1, &detailsBssid, EQUAL);
+  detailsBssidHdr.setColor(TFT_YELLOW);
+  detailsBssidHdr.setFont(2); // larger font size for BSSID.
+  detailsBssid.setFont(2);
+
+  detailsModeBwCols.setColumn(0, &detailsModes, EQUAL);
+  detailsModeBwCols.setColumn(1, &detailsBandwidth, EQUAL);
+  detailsModes.setColor(TFT_YELLOW);
+  detailsModes.setFont(0);
+  detailsBandwidth.setColor(TFT_YELLOW);
+  detailsBandwidth.setFont(0);
+
+  detailsSecurityCols.setColumn(0, &detailsSecurityHdr, 60);
+  detailsSecurityCols.setColumn(1, &detailsSecurity, EQUAL);
+  detailsSecurityHdr.setColor(TFT_YELLOW);
+  detailsSecurityHdr.setFont(2);
+  detailsSecurity.setFont(2);
+
+  detailsHeatmapHdr.setColor(TFT_YELLOW);
+  detailsHeatmapHdr.setFont(0);
+
+  detailsHeatmap.setColor(TFT_WHITE);
+
+  // also theme the buttons displayed on the details page
+  detailsBackBtn.setColor(TFT_BLUE);
+  detailsBackBtn.setPadding(4, 4, 0, 0);
+
+  detailsDisableBtn.setColor(TFT_BLUE);
+  detailsDisableBtn.setPadding(4, 4, 0, 0);
+
+  scanWifi(); // Populates VScroll and global heatmap elements.
+  lcd.fillScreen(TFT_BLACK); // Clear 'loading' screen msg.
+  screen.render();
+}
 
 static void pollButtons() {
   for (unsigned int i = 0; i < buttons.size(); i++) {
